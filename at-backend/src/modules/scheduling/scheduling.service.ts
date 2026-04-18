@@ -7,6 +7,7 @@ import { ScheduleStatus } from "../../common/enums/schedule-status.enum";
 import { TreatmentRecurrence } from "../../common/enums/treatment-recurrence.enum";
 import {
   buildClinicalInstructionLabel,
+  formatClinicalRecurrenceLabel,
   normalizeWeeklyDay,
   validateMonthlyDay,
 } from "../../common/utils/recurrence.util";
@@ -457,6 +458,21 @@ export class SchedulingService {
   }
 
   private mapScheduleEntry(entry: ScheduledDose): ScheduleEntryDto {
+    const recurrenceLabel = entry.recurrenceType
+      ? formatClinicalRecurrenceLabel({
+          recurrenceType: entry.recurrenceType,
+          startDate: entry.startDate ?? "",
+          endDate: entry.endDate,
+          weeklyDay: entry.weeklyDay,
+          monthlyDay: entry.monthlyDay,
+          alternateDaysInterval: entry.alternateDaysInterval,
+          continuousUse: entry.continuousUse,
+          isPrn: entry.isPrn,
+          prnReason: entry.prnReason,
+          clinicalInstructionLabel: entry.clinicalInstructionLabel,
+        })
+      : undefined;
+
     return {
       medicationId: entry.prescriptionItem.medication.id,
       medicationName:
@@ -468,6 +484,7 @@ export class SchedulingService {
       administrationUnit: entry.administrationUnit,
       administrationLabel: entry.administrationLabel ?? entry.doseLabel,
       recurrenceType: entry.recurrenceType,
+      recurrenceLabel,
       startDate: entry.startDate,
       endDate: entry.endDate,
       weeklyDay: entry.weeklyDay,
@@ -486,8 +503,8 @@ export class SchedulingService {
 
   async getScheduleByPrescription(
     prescriptionId: string,
-  ): Promise<ScheduledDose[]> {
-    return this.scheduledDoseRepository.find({
+  ): Promise<ScheduleEntryDto[]> {
+    const scheduledDoses = await this.scheduledDoseRepository.find({
       where: { prescription: { id: prescriptionId } },
       relations: [
         "prescriptionItem",
@@ -496,6 +513,8 @@ export class SchedulingService {
       ],
       order: { timeInMinutes: "ASC" },
     });
+
+    return scheduledDoses.map((entry) => this.mapScheduleEntry(entry));
   }
 }
 

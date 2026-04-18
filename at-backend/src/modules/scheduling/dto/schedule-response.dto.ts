@@ -10,6 +10,7 @@ export interface ScheduleEntryDto {
   administrationUnit?: string;
   administrationLabel: string;
   recurrenceType?: TreatmentRecurrence;
+  recurrenceLabel?: string;
   startDate?: string;
   endDate?: string;
   weeklyDay?: string;
