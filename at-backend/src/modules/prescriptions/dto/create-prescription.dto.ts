@@ -3,6 +3,7 @@ import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsDefined, IsEnum, IsIn
 import { DoseUnit } from '../../../common/enums/dose-unit.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
+import { IsHhmmTime } from '../../../common/validators/is-hhmm-time.validator';
 import {
   IsPrescriptionItemClinicallyValid,
   shouldValidateAlternateDaysInterval,
@@ -113,7 +114,7 @@ export class CreatePrescriptionItemDto {
   @IsDefined({ message: 'manualTimes é obrigatório quando manualAdjustmentEnabled for true.' })
   @IsArray()
   @ArrayMinSize(1)
-  @Matches(/^\d{2}:\d{2}$/, { each: true })
+  @IsHhmmTime({ each: true })
   manualTimes?: string[];
 
   @IsOptional()

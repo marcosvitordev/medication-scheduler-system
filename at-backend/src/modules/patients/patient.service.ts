@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { hhmmToMinutes } from '../../common/utils/time.util';
 import { MealAnchor } from '../../common/enums/meal-anchor.enum';
 import { validateRoutine } from '../../common/utils/routine.util';
@@ -13,7 +13,8 @@ import { PatientRoutine } from './entities/patient-routine.entity';
 export class PatientService {
   constructor(
     @InjectRepository(Patient) private readonly patientRepository: Repository<Patient>,
-    @InjectRepository(PatientRoutine) private readonly routineRepository: Repository<PatientRoutine>
+    @InjectRepository(PatientRoutine) private readonly routineRepository: Repository<PatientRoutine>,
+    private readonly dataSource: DataSource
   ) {}
 
   async createPatient(dto: CreatePatientDto): Promise<Patient> {
@@ -21,9 +22,6 @@ export class PatientService {
   }
 
   async addRoutine(patientId: string, dto: CreateRoutineDto): Promise<PatientRoutine> {
-    const patient = await this.patientRepository.findOne({ where: { id: patientId } });
-    if (!patient) throw new NotFoundException('Paciente não encontrado.');
-
     validateRoutine({
       [MealAnchor.ACORDAR]: hhmmToMinutes(dto.acordar),
       [MealAnchor.CAFE]: hhmmToMinutes(dto.cafe),
@@ -33,8 +31,26 @@ export class PatientService {
       [MealAnchor.DORMIR]: hhmmToMinutes(dto.dormir)
     });
 
-    await this.routineRepository.update({ patient: { id: patientId }, active: true }, { active: false });
-    return this.routineRepository.save(this.routineRepository.create({ ...dto, patient, active: dto.active ?? true }));
+    return this.dataSource.transaction(async (manager) => {
+      const patientRepository = manager.getRepository(Patient);
+      const routineRepository = manager.getRepository(PatientRoutine);
+
+      const patient = await patientRepository.findOne({ where: { id: patientId } });
+      if (!patient) throw new NotFoundException('Paciente não encontrado.');
+
+      await routineRepository.update(
+        { patient: { id: patientId }, active: true },
+        { active: false }
+      );
+
+      return routineRepository.save(
+        routineRepository.create({
+          ...dto,
+          patient,
+          active: true
+        })
+      );
+    });
   }
 
   async findById(id: string): Promise<Patient> {
@@ -44,9 +60,20 @@ export class PatientService {
   }
 
   async getActiveRoutine(patientId: string): Promise<PatientRoutine> {
-    const routine = await this.routineRepository.findOne({ where: { patient: { id: patientId }, active: true }, relations: ['patient'] });
-    if (!routine) throw new NotFoundException('Rotina ativa do paciente não encontrada.');
-    return routine;
+    const routines = await this.routineRepository.find({
+      where: { patient: { id: patientId }, active: true },
+      relations: ['patient']
+    });
+
+    if (routines.length === 0) {
+      throw new NotFoundException('Rotina ativa do paciente não encontrada.');
+    }
+
+    if (routines.length > 1) {
+      throw new ConflictException('Paciente com múltiplas rotinas ativas. Corrija a consistência da base.');
+    }
+
+    return routines[0];
   }
 
   async list(): Promise<Patient[]> {

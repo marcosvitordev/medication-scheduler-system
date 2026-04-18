@@ -6,13 +6,10 @@ import { MealAnchor } from "../../common/enums/meal-anchor.enum";
 import { ScheduleStatus } from "../../common/enums/schedule-status.enum";
 import { TreatmentRecurrence } from "../../common/enums/treatment-recurrence.enum";
 import {
+  buildRecurrenceMetadata,
   buildClinicalInstructionLabel,
   formatClinicalRecurrenceLabel,
-  normalizeMonthlyRule,
-  normalizeWeeklyDay,
-  validateMonthlyDay,
 } from "../../common/utils/recurrence.util";
-import { calculateEndDate } from "../../common/utils/treatment-window.util";
 import { minutesToHhmm, hhmmToMinutes } from "../../common/utils/time.util";
 import { PatientService } from "../patients/patient.service";
 import { Prescription } from "../prescriptions/entities/prescription.entity";
@@ -57,9 +54,8 @@ export class SchedulingService {
 
     let entries = this.buildBaseEntries(prescription, anchors);
     entries = entries.map((entry) => this.resolveDoseForEntry(entry));
-    entries = entries.map((entry) => this.attachRecurrenceMetadata(entry));
     entries = entries.map((entry) =>
-      this.attachTreatmentWindow(entry, prescription),
+      this.attachClinicalMetadata(entry, prescription),
     );
     entries = entries.map((entry) => this.attachPrnMetadata(entry));
     entries = this.applySpecialRules(entries, anchors);
@@ -316,40 +312,13 @@ export class SchedulingService {
     };
   }
 
-  private attachRecurrenceMetadata(entry: WorkingEntry): WorkingEntry {
-    const item = entry.prescriptionItem;
-    const recurrenceType = item.recurrenceType ?? TreatmentRecurrence.DAILY;
-
-    return {
-      ...entry,
-      recurrenceType,
-      weeklyDay: normalizeWeeklyDay(item.weeklyDay),
-      monthlyRule: normalizeMonthlyRule(item.monthlyRule),
-      monthlyDay: validateMonthlyDay(item.monthlyDay),
-      alternateDaysInterval:
-        recurrenceType === TreatmentRecurrence.ALTERNATE_DAYS
-          ? item.alternateDaysInterval ?? 2
-          : undefined,
-      continuousUse: item.continuousUse,
-      isPrn: recurrenceType === TreatmentRecurrence.PRN,
-      prnReason:
-        recurrenceType === TreatmentRecurrence.PRN ? item.prnReason : undefined,
-    };
-  }
-
-  private attachTreatmentWindow(
+  private attachClinicalMetadata(
     entry: WorkingEntry,
     prescription: Prescription,
   ): WorkingEntry {
     return {
       ...entry,
-      startDate: prescription.startedAt,
-      endDate: entry.continuousUse
-        ? undefined
-        : calculateEndDate(
-            prescription.startedAt,
-            entry.prescriptionItem.treatmentDays,
-          ),
+      ...buildRecurrenceMetadata(entry.prescriptionItem, prescription),
     };
   }
 

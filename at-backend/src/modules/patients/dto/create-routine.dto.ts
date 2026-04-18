@@ -1,25 +1,21 @@
-import { IsBoolean, IsOptional, Matches } from 'class-validator';
+import { IsHhmmTime } from '../../../common/validators/is-hhmm-time.validator';
 
 export class CreateRoutineDto {
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   acordar: string;
 
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   cafe: string;
 
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   almoco: string;
 
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   lanche: string;
 
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   jantar: string;
 
-  @Matches(/^\d{2}:\d{2}$/)
+  @IsHhmmTime()
   dormir: string;
-
-  @IsOptional()
-  @IsBoolean()
-  active?: boolean;
 }
