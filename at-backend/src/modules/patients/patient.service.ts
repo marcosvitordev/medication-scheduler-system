@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { hhmmToMinutes } from '../../common/utils/time.util';
 import { MealAnchor } from '../../common/enums/meal-anchor.enum';
 import { validateRoutine } from '../../common/utils/routine.util';
@@ -31,26 +31,34 @@ export class PatientService {
       [MealAnchor.DORMIR]: hhmmToMinutes(dto.dormir)
     });
 
-    return this.dataSource.transaction(async (manager) => {
-      const patientRepository = manager.getRepository(Patient);
-      const routineRepository = manager.getRepository(PatientRoutine);
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const patientRepository = manager.getRepository(Patient);
+        const routineRepository = manager.getRepository(PatientRoutine);
 
-      const patient = await patientRepository.findOne({ where: { id: patientId } });
-      if (!patient) throw new NotFoundException('Paciente não encontrado.');
+        const patient = await patientRepository.findOne({ where: { id: patientId } });
+        if (!patient) throw new NotFoundException('Paciente não encontrado.');
 
-      await routineRepository.update(
-        { patient: { id: patientId }, active: true },
-        { active: false }
-      );
+        await routineRepository.update(
+          { patient: { id: patientId }, active: true },
+          { active: false }
+        );
 
-      return routineRepository.save(
-        routineRepository.create({
-          ...dto,
-          patient,
-          active: true
-        })
-      );
-    });
+        return routineRepository.save(
+          routineRepository.create({
+            ...dto,
+            patient,
+            active: true
+          })
+        );
+      });
+    } catch (error) {
+      if (this.isSingleActiveRoutineUniqueViolation(error)) {
+        throw new ConflictException('Já existe uma rotina ativa para este paciente. Tente novamente.');
+      }
+
+      throw error;
+    }
   }
 
   async findById(id: string): Promise<Patient> {
@@ -78,5 +86,17 @@ export class PatientService {
 
   async list(): Promise<Patient[]> {
     return this.patientRepository.find({ relations: ['routines'] });
+  }
+
+  private isSingleActiveRoutineUniqueViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as { code?: string; constraint?: string } | undefined;
+    return (
+      driverError?.code === '23505' &&
+      driverError?.constraint === 'IDX_patient_routines_single_active'
+    );
   }
 }

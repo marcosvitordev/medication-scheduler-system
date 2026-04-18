@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Patient } from './patient.entity';
 
 @Entity('patient_routines')
@@ -29,4 +29,7 @@ export class PatientRoutine {
 
   @Column({ default: true })
   active: boolean;
+
+  @CreateDateColumn({ type: 'timestamp with time zone' })
+  createdAt: Date;
 }

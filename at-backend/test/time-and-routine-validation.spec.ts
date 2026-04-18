@@ -31,6 +31,10 @@ describe('time and routine validation', () => {
     expect(calculateEndDate('2026-04-17', 10)).toBe('2026-04-26');
     expect(calculateEndDate('2026-01-30', 5)).toBe('2026-02-03');
   });
+
+  it('throws a bad request exception for invalid clinical dates', () => {
+    expect(() => calculateEndDate('2026-02-30', 3)).toThrow(BadRequestException);
+  });
 });
 
 function flattenErrors(errors: ValidationError[]): string[] {
