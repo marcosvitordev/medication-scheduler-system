@@ -1,8 +1,18 @@
 import { Transform, Type } from 'class-transformer';
-import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsBoolean, IsDateString, IsDefined, IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { DoseUnit } from '../../../common/enums/dose-unit.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
+import {
+  IsPrescriptionItemClinicallyValid,
+  shouldValidateAlternateDaysInterval,
+  shouldValidateManualTimes,
+  shouldValidateMonthlyDay,
+  shouldValidateMonthlyRule,
+  shouldValidatePerDoseOverrides,
+  shouldValidateTreatmentDays,
+  shouldValidateWeeklyDay
+} from '../validators/prescription-item.validator';
 
 export class CreatePrescriptionItemDoseOverrideDto {
   @IsString()
@@ -18,11 +28,15 @@ export class CreatePrescriptionItemDoseOverrideDto {
 }
 
 export class CreatePrescriptionItemDto {
+  @IsPrescriptionItemClinicallyValid()
+  private readonly clinicalValidation: boolean;
+
   @IsUUID()
   medicationId: string;
 
   @Type(() => Number)
   @IsInt()
+  @Min(1)
   frequency: number;
 
   @IsOptional()
@@ -42,8 +56,9 @@ export class CreatePrescriptionItemDto {
   @IsBoolean()
   sameDosePerSchedule: boolean;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidatePerDoseOverrides(item, value))
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreatePrescriptionItemDoseOverrideDto)
   perDoseOverrides?: CreatePrescriptionItemDoseOverrideDto[];
@@ -52,27 +67,34 @@ export class CreatePrescriptionItemDto {
   @IsEnum(TreatmentRecurrence)
   recurrenceType?: TreatmentRecurrence;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateAlternateDaysInterval(item, value))
+  @IsDefined({ message: 'alternateDaysInterval é obrigatório para recorrência ALTERNATE_DAYS.' })
   @Type(() => Number)
   @IsInt()
+  @Min(2)
   alternateDaysInterval?: number;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateWeeklyDay(item, value))
+  @IsDefined({ message: 'weeklyDay é obrigatório para recorrência WEEKLY.' })
   @IsString()
   weeklyDay?: string;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateMonthlyRule(item, value))
   @IsString()
   monthlyRule?: string;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateMonthlyDay(item, value))
   @Type(() => Number)
   @IsInt()
+  @Min(1)
+  @Max(31)
   monthlyDay?: number;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateTreatmentDays(item, value))
+  @IsDefined({ message: 'treatmentDays é obrigatório quando o tratamento não for contínuo e nem PRN.' })
   @Type(() => Number)
   @IsInt()
+  @Min(1)
   treatmentDays?: number;
 
   @IsBoolean()
@@ -85,8 +107,10 @@ export class CreatePrescriptionItemDto {
   @IsBoolean()
   manualAdjustmentEnabled: boolean;
 
-  @IsOptional()
+  @ValidateIf((item, value) => shouldValidateManualTimes(item, value))
+  @IsDefined({ message: 'manualTimes é obrigatório quando manualAdjustmentEnabled for true.' })
   @IsArray()
+  @ArrayMinSize(1)
   @Matches(/^\d{2}:\d{2}$/, { each: true })
   manualTimes?: string[];
 
