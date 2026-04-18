@@ -80,6 +80,7 @@ export class SchedulingService {
     entries = entries.map((entry) =>
       this.attachClinicalMetadata(entry, prescription),
     );
+    entries = entries.map((entry) => this.attachPrnMetadata(entry));
     entries = this.applySpecialRules(entries, anchors);
     entries.sort(
       (a, b) =>
@@ -107,7 +108,9 @@ export class SchedulingService {
           monthlyDay: entry.monthlyDay,
           alternateDaysInterval: entry.alternateDaysInterval,
           continuousUse: entry.continuousUse,
+          isPrn: entry.isPrn,
           prnReason: entry.prnReason,
+          clinicalInstructionLabel: entry.clinicalInstructionLabel,
           timeInMinutes: entry.timeInMinutes,
           timeFormatted: entry.timeFormatted,
           status: entry.status,
@@ -136,7 +139,9 @@ export class SchedulingService {
         monthlyDay: entry.monthlyDay,
         alternateDaysInterval: entry.alternateDaysInterval,
         continuousUse: entry.continuousUse,
+        isPrn: entry.isPrn,
         prnReason: entry.prnReason,
+        clinicalInstructionLabel: entry.clinicalInstructionLabel,
         timeInMinutes: entry.timeInMinutes,
         timeFormatted: entry.timeFormatted,
         status: entry.status,
@@ -300,6 +305,7 @@ export class SchedulingService {
       administrationUnit: administration.administrationUnit,
       administrationLabel: administration.administrationLabel,
       continuousUse: item.continuousUse,
+      isPrn: false,
       timeInMinutes,
       timeFormatted: minutesToHhmm(timeInMinutes),
       status: ScheduleStatus.ACTIVE,
@@ -316,6 +322,19 @@ export class SchedulingService {
     return {
       ...entry,
       ...buildRecurrenceMetadata(entry.prescriptionItem, prescription),
+    };
+  }
+
+  private attachPrnMetadata(entry: WorkingEntry): WorkingEntry {
+    if (!entry.isPrn) {
+      return entry;
+    }
+
+    return {
+      ...entry,
+      note:
+        entry.note ??
+        "Dose sob demanda; administrar apenas se houver indicacao clinica.",
     };
   }
 

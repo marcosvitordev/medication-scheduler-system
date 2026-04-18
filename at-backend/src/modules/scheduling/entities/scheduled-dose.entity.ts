@@ -48,8 +48,14 @@ export class ScheduledDose {
   @Column({ default: false })
   continuousUse: boolean;
 
+  @Column({ default: false })
+  isPrn: boolean;
+
   @Column({ type: 'varchar', length: 20, nullable: true })
   prnReason?: PrnReason;
+
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  clinicalInstructionLabel?: string;
 
   @Column({ type: 'int' })
   timeInMinutes: number;

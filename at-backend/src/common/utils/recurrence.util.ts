@@ -13,7 +13,9 @@ export interface RecurrenceMetadata {
   monthlyDay?: number;
   alternateDaysInterval?: number;
   continuousUse: boolean;
+  isPrn: boolean;
   prnReason?: PrnReason;
+  clinicalInstructionLabel?: string;
 }
 
 export function buildRecurrenceMetadata(
@@ -36,8 +38,13 @@ export function buildRecurrenceMetadata(
         ? item.alternateDaysInterval ?? 2
         : undefined,
     continuousUse: item.continuousUse,
+    isPrn: recurrenceType === TreatmentRecurrence.PRN,
     prnReason:
       recurrenceType === TreatmentRecurrence.PRN ? item.prnReason : undefined,
+    clinicalInstructionLabel: buildClinicalInstructionLabel(
+      recurrenceType,
+      item.prnReason,
+    ),
   };
 }
 
@@ -71,9 +78,39 @@ export function formatClinicalRecurrenceLabel(metadata: RecurrenceMetadata): str
     case TreatmentRecurrence.MONTHLY:
       return metadata.monthlyDay ? `Mensal no dia ${metadata.monthlyDay}` : 'Mensal';
     case TreatmentRecurrence.PRN:
-      return metadata.prnReason ? `Se necessario: ${metadata.prnReason}` : 'Se necessario';
+      return metadata.prnReason
+        ? `Se necessario: ${formatPrnReasonLabel(metadata.prnReason)}`
+        : 'Se necessario';
     case TreatmentRecurrence.DAILY:
     default:
       return 'Diario';
+  }
+}
+
+export function buildClinicalInstructionLabel(
+  recurrenceType: TreatmentRecurrence,
+  prnReason?: PrnReason,
+): string | undefined {
+  if (recurrenceType !== TreatmentRecurrence.PRN) {
+    return undefined;
+  }
+
+  if (!prnReason) {
+    return 'Uso se necessario.';
+  }
+
+  return `Uso se necessario em caso de ${formatPrnReasonLabel(prnReason)}.`;
+}
+
+export function formatPrnReasonLabel(prnReason: PrnReason): string {
+  switch (prnReason) {
+    case PrnReason.CRISIS:
+      return 'crise';
+    case PrnReason.FEVER:
+      return 'febre';
+    case PrnReason.PAIN:
+      return 'dor';
+    default:
+      return String(prnReason).toLowerCase();
   }
 }

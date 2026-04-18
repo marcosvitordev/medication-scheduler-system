@@ -16,7 +16,9 @@ export interface ScheduleEntryDto {
   monthlyDay?: number;
   alternateDaysInterval?: number;
   continuousUse: boolean;
+  isPrn: boolean;
   prnReason?: PrnReason;
+  clinicalInstructionLabel?: string;
   timeInMinutes: number;
   timeFormatted: string;
   status: string;
