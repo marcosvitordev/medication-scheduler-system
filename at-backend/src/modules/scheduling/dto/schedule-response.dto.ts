@@ -136,8 +136,30 @@ export interface ScheduledMedicationDto {
   fases: ScheduledPhaseDto[];
 }
 
+export interface SchedulingPatientHeaderDto {
+  nome_completo: string;
+  data_nascimento: string | null;
+  idade: number | null;
+  rg: string | null;
+  cpf: string | null;
+  telefone: string | null;
+}
+
+export interface SchedulingRoutineHeaderDto {
+  acordar: string;
+  cafe: string;
+  almoco: string;
+  lanche: string;
+  jantar: string;
+  dormir: string;
+}
+
 export interface SchedulingResultDto {
   paciente_id: string;
   prescricao_id: string;
+  paciente: SchedulingPatientHeaderDto;
+  rotina: SchedulingRoutineHeaderDto;
+  data_inicio_prescricao: string | null;
+  data_geracao_schedule: string;
   medicamentos: ScheduledMedicationDto[];
 }

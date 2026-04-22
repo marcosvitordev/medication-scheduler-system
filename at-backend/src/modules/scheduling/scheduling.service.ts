@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ClinicalAnchor } from '../../common/enums/clinical-anchor.enum';
@@ -14,6 +14,7 @@ import { MonthlySpecialReference } from '../../common/enums/monthly-special-refe
 import { calculateEndDate } from '../../common/utils/treatment-window.util';
 import { hhmmToMinutes, minutesToHhmm } from '../../common/utils/time.util';
 import { PatientService } from '../patients/patient.service';
+import { PatientRoutine } from '../patients/entities/patient-routine.entity';
 import { PatientPrescriptionMedication } from '../patient-prescriptions/entities/patient-prescription-medication.entity';
 import { PatientPrescriptionPhase } from '../patient-prescriptions/entities/patient-prescription-phase.entity';
 import { PatientPrescription } from '../patient-prescriptions/entities/patient-prescription.entity';
@@ -33,6 +34,11 @@ type ScheduleAnchors = Record<ClinicalAnchor, number>;
 interface PhaseWindow {
   startDate: string;
   endDate?: string;
+}
+
+interface ScheduleContext {
+  routine: PatientRoutine;
+  anchors: ScheduleAnchors;
 }
 
 interface MonthlySpecialRule {
@@ -91,8 +97,9 @@ export class SchedulingService {
     prescription: PatientPrescription,
     entityManager?: EntityManager,
   ): Promise<SchedulingResultDto> {
-    const anchors = await this.resolveScheduleAnchors(prescription);
-    let entries = this.buildBaseEntries(prescription, anchors);
+    const generationDate = new Date();
+    const scheduleContext = await this.resolveScheduleContextForBuild(prescription);
+    let entries = this.buildBaseEntries(prescription, scheduleContext.anchors);
     entries = this.applyConflictRules(entries);
     entries = entries.map((entry) => ({
       ...entry,
@@ -106,17 +113,24 @@ export class SchedulingService {
     entries = this.sortEntries(entries);
 
     const persisted = await this.persistSchedule(prescription, entries, entityManager);
-    return this.mapSchedulingResult(prescription, persisted);
+    return this.mapSchedulingResult(
+      prescription,
+      persisted,
+      scheduleContext.routine,
+      generationDate,
+    );
   }
 
   async getScheduleByPrescription(prescriptionId: string): Promise<SchedulingResultDto> {
+    const generationDate = new Date();
     const prescription = await this.prescriptionRepository.findOne({
       where: { id: prescriptionId },
-      relations: ['patient', 'medications', 'medications.phases'],
+      relations: ['patient', 'patient.routines', 'medications', 'medications.phases'],
     });
     if (!prescription) {
       throw new NotFoundException('Prescrição do paciente não encontrada.');
     }
+    const routine = this.resolveActiveRoutineFromPatient(prescription);
 
     const scheduledDoses = await this.scheduledDoseRepository.find({
       where: { prescription: { id: prescriptionId } },
@@ -124,13 +138,22 @@ export class SchedulingService {
       order: { phaseOrder: 'ASC', timeInMinutes: 'ASC' },
     });
 
-    return this.mapSchedulingResult(prescription, scheduledDoses);
+    return this.mapSchedulingResult(prescription, scheduledDoses, routine, generationDate);
   }
 
-  private async resolveScheduleAnchors(
+  private async resolveScheduleContextForBuild(
     prescription: PatientPrescription,
-  ): Promise<ScheduleAnchors> {
+  ): Promise<ScheduleContext> {
     const routine = await this.patientService.getActiveRoutine(prescription.patient.id);
+    return {
+      routine,
+      anchors: this.toScheduleAnchors(routine),
+    };
+  }
+
+  private toScheduleAnchors(
+    routine: Pick<PatientRoutine, 'acordar' | 'cafe' | 'almoco' | 'lanche' | 'jantar' | 'dormir'>,
+  ): ScheduleAnchors {
     return {
       [ClinicalAnchor.ACORDAR]: hhmmToMinutes(routine.acordar),
       [ClinicalAnchor.CAFE]: hhmmToMinutes(routine.cafe),
@@ -140,6 +163,27 @@ export class SchedulingService {
       [ClinicalAnchor.DORMIR]: hhmmToMinutes(routine.dormir),
       [ClinicalAnchor.MANUAL]: 0,
     };
+  }
+
+  private resolveActiveRoutineFromPatient(prescription: PatientPrescription): PatientRoutine {
+    const activeRoutines = (prescription.patient.routines ?? [])
+      .filter((routine) => routine.active)
+      .sort((left, right) => {
+        const leftDate = left.createdAt ? new Date(left.createdAt).getTime() : 0;
+        const rightDate = right.createdAt ? new Date(right.createdAt).getTime() : 0;
+        return rightDate - leftDate || right.id.localeCompare(left.id);
+      });
+
+    if (activeRoutines.length === 0) {
+      throw new NotFoundException('Rotina ativa do paciente não encontrada.');
+    }
+    if (activeRoutines.length > 1) {
+      throw new ConflictException(
+        'Paciente com múltiplas rotinas ativas. Corrija a consistência da base.',
+      );
+    }
+
+    return activeRoutines[0];
   }
 
   private buildBaseEntries(
@@ -409,6 +453,8 @@ export class SchedulingService {
   private mapSchedulingResult(
     prescription: PatientPrescription,
     doses: ScheduledDose[],
+    routine: PatientRoutine,
+    generationDate: Date,
   ): SchedulingResultDto {
     const medications = [...prescription.medications].sort((a, b) => {
       const leftName = a.medicationSnapshot.commercialName ?? a.medicationSnapshot.activePrinciple;
@@ -419,6 +465,10 @@ export class SchedulingService {
     return {
       paciente_id: prescription.patient.id,
       prescricao_id: prescription.id,
+      paciente: this.mapPatientHeader(prescription, generationDate),
+      rotina: this.mapRoutineHeader(routine),
+      data_inicio_prescricao: toPtBrDate(prescription.startedAt),
+      data_geracao_schedule: toPtBrDateFromDate(generationDate),
       medicamentos: medications.map((medication) => ({
         nome_medicamento:
           medication.medicationSnapshot.commercialName ??
@@ -435,6 +485,31 @@ export class SchedulingService {
         protocolo_descricao: medication.protocolSnapshot.description ?? null,
         fases: this.mapPhases(medication, doses),
       })),
+    };
+  }
+
+  private mapPatientHeader(
+    prescription: PatientPrescription,
+    generationDate: Date,
+  ): SchedulingResultDto['paciente'] {
+    return {
+      nome_completo: prescription.patient.fullName,
+      data_nascimento: toPtBrDate(prescription.patient.birthDate),
+      idade: calculateAge(prescription.patient.birthDate, generationDate),
+      rg: prescription.patient.rg ?? null,
+      cpf: prescription.patient.cpf ?? null,
+      telefone: prescription.patient.phone ?? null,
+    };
+  }
+
+  private mapRoutineHeader(routine: PatientRoutine): SchedulingResultDto['rotina'] {
+    return {
+      acordar: routine.acordar,
+      cafe: routine.cafe,
+      almoco: routine.almoco,
+      lanche: routine.lanche,
+      jantar: routine.jantar,
+      dormir: routine.dormir,
     };
   }
 
@@ -617,6 +692,34 @@ function toPtBrDate(dateString: string | undefined): string | null {
   const [year, month, day] = dateString.split('-');
   if (!year || !month || !day) return null;
   return `${day}/${month}/${year}`;
+}
+
+function toPtBrDateFromDate(date: Date): string {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear());
+  return `${day}/${month}/${year}`;
+}
+
+function calculateAge(birthDate: string | undefined, referenceDate: Date): number | null {
+  if (!birthDate) return null;
+  const [yearRaw, monthRaw, dayRaw] = birthDate.split('-');
+  const birthYear = Number(yearRaw);
+  const birthMonth = Number(monthRaw);
+  const birthDay = Number(dayRaw);
+
+  if (!birthYear || !birthMonth || !birthDay) return null;
+
+  const referenceYear = referenceDate.getFullYear();
+  const referenceMonth = referenceDate.getMonth() + 1;
+  const referenceDay = referenceDate.getDate();
+
+  let age = referenceYear - birthYear;
+  const hadBirthdayThisYear =
+    referenceMonth > birthMonth || (referenceMonth === birthMonth && referenceDay >= birthDay);
+  if (!hadBirthdayThisYear) age -= 1;
+
+  return age >= 0 ? age : null;
 }
 
 function toStatusLabel(status: string): string {

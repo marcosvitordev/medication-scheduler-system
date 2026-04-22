@@ -53,8 +53,27 @@ describe('SchedulingService final schedule JSON contract', () => {
     expect(result).toMatchObject({
       paciente_id: expect.any(String),
       prescricao_id: expect.any(String),
+      paciente: {
+        nome_completo: 'Paciente Teste',
+        data_nascimento: '01/01/1970',
+        idade: expect.any(Number),
+        rg: 'RG-TESTE',
+        cpf: '000.000.000-00',
+        telefone: '(68)99999-9999',
+      },
+      rotina: {
+        acordar: '06:00',
+        cafe: '07:00',
+        almoco: '12:00',
+        lanche: '15:00',
+        jantar: '19:00',
+        dormir: '22:00',
+      },
+      data_inicio_prescricao: '20/02/2026',
+      data_geracao_schedule: expect.any(String),
       medicamentos: expect.any(Array),
     });
+    expect(result.data_geracao_schedule).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
 
     const medication = result.medicamentos[0];
     expect(medication).toMatchObject({
@@ -145,6 +164,52 @@ describe('SchedulingService final schedule JSON contract', () => {
       data_inicio: '15/03/2026',
       data_fim: null,
       uso_continuo: true,
+    });
+  });
+
+  it('returns deterministic idade and data_geracao_schedule with frozen clock', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-04-22T10:00:00'));
+    try {
+      const { service } = createSchedulingService();
+      const result = await buildScheduleResult(service, [
+        buildPrescriptionMedication(),
+      ], { startedAt: '2026-04-17' });
+
+      expect(result.paciente).toMatchObject({
+        nome_completo: 'Paciente Teste',
+        data_nascimento: '01/01/1970',
+        idade: 56,
+      });
+      expect(result.data_geracao_schedule).toBe('22/04/2026');
+      expect(result.data_inicio_prescricao).toBe('17/04/2026');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('returns null for optional patient document fields when absent', async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication(),
+    ], {
+      patient: {
+        id: 'patient-optional-null',
+        fullName: 'Paciente Sem Documento',
+        birthDate: '1980-07-05',
+        rg: undefined,
+        cpf: undefined,
+        phone: undefined,
+        routines: [],
+        prescriptions: [],
+      } as never,
+    });
+
+    expect(result.paciente).toMatchObject({
+      nome_completo: 'Paciente Sem Documento',
+      data_nascimento: '05/07/1980',
+      rg: null,
+      cpf: null,
+      telefone: null,
     });
   });
 
