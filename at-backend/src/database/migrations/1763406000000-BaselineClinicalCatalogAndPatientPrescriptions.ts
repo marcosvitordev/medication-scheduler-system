@@ -123,6 +123,8 @@ export class BaselineClinicalCatalogAndPatientPrescriptions1763406000000
         "treatmentDays" integer,
         "continuousUse" boolean NOT NULL DEFAULT false,
         "prnReason" character varying(20),
+        "ocularLaterality" character varying(30),
+        "oticLaterality" character varying(30),
         "manualAdjustmentEnabled" boolean NOT NULL DEFAULT false,
         "manualTimes" text,
         "prescriptionMedicationId" uuid NOT NULL REFERENCES "patient_prescription_medications"("id") ON DELETE CASCADE

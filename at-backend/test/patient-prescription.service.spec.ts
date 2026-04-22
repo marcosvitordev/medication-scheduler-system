@@ -6,6 +6,8 @@ import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-
 import { ClinicalSemanticTag } from '../src/common/enums/clinical-semantic-tag.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
+import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import { PatientPrescriptionService } from '../src/modules/patient-prescriptions/patient-prescription.service';
 
@@ -128,6 +130,72 @@ describe('PatientPrescriptionService', () => {
         },
       ],
     };
+  }
+
+  function mockLoadedPrescriptionForLaterality(
+    prescriptionRepository: { findOne: jest.Mock },
+    phaseOverrides: Record<string, unknown> = {},
+  ) {
+    prescriptionRepository.findOne.mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        id: where.id,
+        patient: { id: 'patient-1' },
+        medications: [
+          {
+            id: 'prescription-medication-1',
+            sourceClinicalMedicationId: 'clinical-1',
+            sourceProtocolId: 'protocol-1',
+            medicationSnapshot: {
+              id: 'clinical-1',
+              commercialName: 'MED TESTE',
+              activePrinciple: 'Principio ativo',
+              presentation: 'Frasco',
+              administrationRoute: 'TESTE',
+              usageInstructions: 'Conforme orientacao.',
+            },
+            protocolSnapshot: {
+              id: 'protocol-1',
+              code: 'GROUP_I_STANDARD',
+              name: 'Grupo I padrao',
+              description: 'Protocolo base',
+              groupCode: GroupCode.GROUP_I,
+              priority: 0,
+              isDefault: true,
+              frequencies: [
+                {
+                  frequency: 1,
+                  steps: [
+                    {
+                      doseLabel: 'D1',
+                      anchor: ClinicalAnchor.CAFE,
+                      offsetMinutes: 0,
+                      semanticTag: ClinicalSemanticTag.STANDARD,
+                    },
+                  ],
+                },
+              ],
+            },
+            interactionRulesSnapshot: [],
+            phases: [
+              {
+                id: 'phase-1',
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                doseValue: '1',
+                doseUnit: DoseUnit.GOTAS,
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                ...phaseOverrides,
+              },
+            ],
+          },
+        ],
+      }),
+    );
   }
 
   it('creates a patient prescription from clinicalMedicationId and protocolId with full snapshots', async () => {
@@ -744,5 +812,273 @@ describe('PatientPrescriptionService', () => {
     });
 
     expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
+  });
+
+  it('accepts ophthalmic prescription phase with ocular laterality (XALACOM equivalent)', async () => {
+    const { service, prescriptionRepository, schedulingService, clinicalCatalogService } =
+      createService();
+
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      commercialName: 'XALACOM',
+      administrationRoute: 'VIA OCULAR',
+      isOphthalmic: true,
+      isOtic: false,
+    });
+    mockLoadedPrescriptionForLaterality(prescriptionRepository, {
+      ocularLaterality: OcularLaterality.RIGHT_EYE,
+      oticLaterality: undefined,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                doseValue: '1',
+                doseUnit: DoseUnit.GOTAS,
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                ocularLaterality: OcularLaterality.RIGHT_EYE,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBeDefined();
+
+    expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
+  });
+
+  it('accepts otic prescription phase with otic laterality (OTOCIRIAX equivalent)', async () => {
+    const { service, prescriptionRepository, schedulingService, clinicalCatalogService } =
+      createService();
+
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      commercialName: 'OTOCIRIAX',
+      administrationRoute: 'VIA OTOLOGICA',
+      isOphthalmic: false,
+      isOtic: true,
+    });
+    mockLoadedPrescriptionForLaterality(prescriptionRepository, {
+      ocularLaterality: undefined,
+      oticLaterality: OticLaterality.BOTH_EARS,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                doseValue: '1',
+                doseUnit: DoseUnit.GOTAS,
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                oticLaterality: OticLaterality.BOTH_EARS,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBeDefined();
+
+    expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
+  });
+
+  it('rejects ophthalmic medication without ocular laterality', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isOphthalmic: true,
+      isOtic: false,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects ophthalmic medication with otic laterality', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isOphthalmic: true,
+      isOtic: false,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                oticLaterality: OticLaterality.RIGHT_EAR,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects otic medication without otic laterality', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isOphthalmic: false,
+      isOtic: true,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects non ocular/otic medication when laterality is provided', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isOphthalmic: false,
+      isOtic: false,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                ocularLaterality: OcularLaterality.LEFT_EYE,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects medication flagged as both ophthalmic and otic', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isOphthalmic: true,
+      isOtic: true,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              {
+                phaseOrder: 1,
+                frequency: 1,
+                sameDosePerSchedule: true,
+                doseAmount: '1 GOTA',
+                recurrenceType: TreatmentRecurrence.DAILY,
+                treatmentDays: 10,
+                continuousUse: false,
+                manualAdjustmentEnabled: false,
+                ocularLaterality: OcularLaterality.RIGHT_EYE,
+                oticLaterality: OticLaterality.RIGHT_EAR,
+              } as never,
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 });

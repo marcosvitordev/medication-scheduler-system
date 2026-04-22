@@ -2,6 +2,8 @@ import { ClinicalInteractionType } from '../src/common/enums/clinical-interactio
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
+import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { ScheduleStatus } from '../src/common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import {
@@ -74,6 +76,11 @@ describe('SchedulingService final schedule JSON contract', () => {
       data_inicio: '20/02/2026',
       data_fim: '26/02/2026',
       uso_continuo: false,
+      lateralidade_ocular_codigo: null,
+      lateralidade_ocular_label: null,
+      lateralidade_otologica_codigo: null,
+      lateralidade_otologica_label: null,
+      via_administracao_label: 'Via oral',
       entradas: expect.any(Array),
     });
     expect(phase.data_inicio).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
@@ -88,6 +95,11 @@ describe('SchedulingService final schedule JSON contract', () => {
       horario: '07:00',
       recorrencia_codigo: TreatmentRecurrence.DAILY,
       recorrencia_label: expect.any(String),
+      lateralidade_ocular_codigo: null,
+      lateralidade_ocular_label: null,
+      lateralidade_otologica_codigo: null,
+      lateralidade_otologica_label: null,
+      via_administracao_label: 'Via oral',
       status_codigo: ScheduleStatus.ACTIVE,
       status_label: expect.any(String),
       observacao: null,
@@ -196,6 +208,94 @@ describe('SchedulingService final schedule JSON contract', () => {
       prioridade_regra: 100,
       janela_antes_minutos: 420,
       janela_depois_minutos: 420,
+    });
+  });
+
+  it('returns ocular laterality labels for XALACOM-equivalent prescription', async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: 'XALACOM',
+          activePrinciple: 'Latanoprosta + Maleato de timolol',
+          presentation: 'Frasco 2,5 ml',
+          administrationRoute: 'Via ocular',
+          usageInstructions: 'Instilar uma gota ao dia.',
+          isOphthalmic: true,
+        },
+        phases: [
+          buildPhase({
+            frequency: 1,
+            doseAmount: '1 GOTA',
+            doseValue: '1',
+            doseUnit: DoseUnit.GOTAS,
+            recurrenceType: TreatmentRecurrence.DAILY,
+            treatmentDays: 10,
+            ocularLaterality: OcularLaterality.RIGHT_EYE,
+          }),
+        ],
+      }),
+    ]);
+
+    const phase = result.medicamentos[0].fases[0];
+    const entry = phase.entradas[0];
+    expect(phase).toMatchObject({
+      lateralidade_ocular_codigo: OcularLaterality.RIGHT_EYE,
+      lateralidade_ocular_label: 'olho direito',
+      lateralidade_otologica_codigo: null,
+      lateralidade_otologica_label: null,
+      via_administracao_label: 'Via ocular - olho direito',
+    });
+    expect(entry).toMatchObject({
+      lateralidade_ocular_codigo: OcularLaterality.RIGHT_EYE,
+      lateralidade_ocular_label: 'olho direito',
+      lateralidade_otologica_codigo: null,
+      lateralidade_otologica_label: null,
+      via_administracao_label: 'Via ocular - olho direito',
+    });
+  });
+
+  it('returns otic laterality labels for OTOCIRIAX-equivalent prescription', async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: 'OTOCIRIAX',
+          activePrinciple: 'Ciprofloxacino + Hidrocortisona',
+          presentation: 'Frasco 10 ml',
+          administrationRoute: 'Via otológica',
+          usageInstructions: 'Instilar conforme orientação.',
+          isOtic: true,
+        },
+        phases: [
+          buildPhase({
+            frequency: 1,
+            doseAmount: '3 GOTAS',
+            doseValue: '3',
+            doseUnit: DoseUnit.GOTAS,
+            recurrenceType: TreatmentRecurrence.DAILY,
+            treatmentDays: 7,
+            oticLaterality: OticLaterality.BOTH_EARS,
+          }),
+        ],
+      }),
+    ]);
+
+    const phase = result.medicamentos[0].fases[0];
+    const entry = phase.entradas[0];
+    expect(phase).toMatchObject({
+      lateralidade_ocular_codigo: null,
+      lateralidade_ocular_label: null,
+      lateralidade_otologica_codigo: OticLaterality.BOTH_EARS,
+      lateralidade_otologica_label: 'nas 2 orelhas',
+      via_administracao_label: 'Via otológica - nas 2 orelhas',
+    });
+    expect(entry).toMatchObject({
+      lateralidade_ocular_codigo: null,
+      lateralidade_ocular_label: null,
+      lateralidade_otologica_codigo: OticLaterality.BOTH_EARS,
+      lateralidade_otologica_label: 'nas 2 orelhas',
+      via_administracao_label: 'Via otológica - nas 2 orelhas',
     });
   });
 });

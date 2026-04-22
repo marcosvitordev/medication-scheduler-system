@@ -55,6 +55,7 @@ export class PatientPrescriptionService {
           }
 
           this.ensureSequentialPhaseOrders(medicationDto.phases);
+          this.ensureLateralityCompatibility(clinicalMedication, medicationDto.phases);
           this.ensureProtocolSupportsPhases(
             protocolSnapshotFromEntity(protocol),
             medicationDto.phases,
@@ -183,6 +184,56 @@ export class PatientPrescriptionService {
         'As fases terapêuticas devem usar phaseOrder sequencial, sem lacunas nem repetição.',
       );
     }
+  }
+
+  private ensureLateralityCompatibility(
+    medication: Awaited<ReturnType<ClinicalCatalogService['findMedicationById']>>,
+    phases: CreatePatientPrescriptionDto['medications'][number]['phases'],
+  ): void {
+    const isOphthalmic = Boolean(medication.isOphthalmic);
+    const isOtic = Boolean(medication.isOtic);
+
+    if (isOphthalmic && isOtic) {
+      throw new UnprocessableEntityException(
+        `Medicamento ${medication.id} está ambíguo: não pode ser oftálmico e otológico ao mesmo tempo para prescrição com lateralidade.`,
+      );
+    }
+
+    phases.forEach((phase) => {
+      if (isOphthalmic) {
+        if (!phase.ocularLaterality) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} exige ocularLaterality para fase ${phase.phaseOrder}.`,
+          );
+        }
+        if (phase.oticLaterality) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} oftálmico não aceita oticLaterality na fase ${phase.phaseOrder}.`,
+          );
+        }
+        return;
+      }
+
+      if (isOtic) {
+        if (!phase.oticLaterality) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} exige oticLaterality para fase ${phase.phaseOrder}.`,
+          );
+        }
+        if (phase.ocularLaterality) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} otológico não aceita ocularLaterality na fase ${phase.phaseOrder}.`,
+          );
+        }
+        return;
+      }
+
+      if (phase.ocularLaterality || phase.oticLaterality) {
+        throw new UnprocessableEntityException(
+          `Medicamento ${medication.id} não é ocular/otológico e não aceita lateralidade na fase ${phase.phaseOrder}.`,
+        );
+      }
+    });
   }
 }
 

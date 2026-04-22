@@ -5,6 +5,8 @@ import { ClinicalAnchor } from '../src/common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../src/common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
+import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import {
   CreateClinicalMedicationDto,
@@ -83,6 +85,32 @@ describe('New DTO clinical validation', () => {
         alternateDaysInterval: 2,
       }),
     ).toHaveLength(0);
+  });
+
+  it('accepts valid ocular and otic laterality enums', () => {
+    expect(
+      validatePhase({
+        ocularLaterality: OcularLaterality.RIGHT_EYE,
+      }),
+    ).toHaveLength(0);
+
+    expect(
+      validatePhase({
+        oticLaterality: OticLaterality.BOTH_EARS,
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('rejects invalid ocular/otic laterality enum values', () => {
+    const ocularErrors = validatePhase({
+      ocularLaterality: 'INVALID' as OcularLaterality,
+    });
+    const oticErrors = validatePhase({
+      oticLaterality: 'INVALID' as OticLaterality,
+    });
+
+    expect(ocularErrors.some((message) => message.includes('ocularLaterality'))).toBe(true);
+    expect(oticErrors.some((message) => message.includes('oticLaterality'))).toBe(true);
   });
 
   it('rejects clinical medication creation without protocol frequencies and steps', () => {

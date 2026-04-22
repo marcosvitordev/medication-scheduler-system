@@ -1,5 +1,7 @@
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { DoseUnit } from '../../../common/enums/dose-unit.enum';
+import { OcularLaterality } from '../../../common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
 import { PrescriptionPhaseDoseOverride } from './patient-prescription-snapshot.types';
@@ -61,6 +63,12 @@ export class PatientPrescriptionPhase {
 
   @Column({ type: 'varchar', length: 20, nullable: true })
   prnReason?: PrnReason;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  ocularLaterality?: OcularLaterality;
+
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  oticLaterality?: OticLaterality;
 
   @Column({ default: false })
   manualAdjustmentEnabled: boolean;

@@ -1,4 +1,6 @@
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
+import { OcularLaterality } from '../../../common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../../../common/enums/otic-laterality.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
 import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
@@ -66,6 +68,11 @@ export interface ScheduleEntryDto {
   uso_continuo: boolean;
   uso_se_necessario: boolean;
   motivo_se_necessario: PrnReason | null;
+  lateralidade_ocular_codigo: OcularLaterality | null;
+  lateralidade_ocular_label: string | null;
+  lateralidade_otologica_codigo: OticLaterality | null;
+  lateralidade_otologica_label: string | null;
+  via_administracao_label: string;
   status_codigo: string;
   status_label: string;
   orientacao_clinica: string | null;
@@ -80,6 +87,11 @@ export interface ScheduledPhaseDto {
   data_inicio: string | null;
   data_fim: string | null;
   uso_continuo: boolean;
+  lateralidade_ocular_codigo: OcularLaterality | null;
+  lateralidade_ocular_label: string | null;
+  lateralidade_otologica_codigo: OticLaterality | null;
+  lateralidade_otologica_label: string | null;
+  via_administracao_label: string;
   entradas: ScheduleEntryDto[];
 }
 

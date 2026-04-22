@@ -5,6 +5,8 @@ import { ClinicalAnchor } from '../../common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../common/enums/clinical-resolution-type.enum';
 import { ClinicalSemanticTag } from '../../common/enums/clinical-semantic-tag.enum';
+import { OcularLaterality } from '../../common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../common/enums/prn-reason.enum';
 import { ScheduleStatus } from '../../common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../../common/enums/treatment-recurrence.enum';
@@ -436,6 +438,16 @@ export class SchedulingService {
               dose.endDate,
               phase,
             );
+            const lateralidade_ocular_codigo = phase.ocularLaterality ?? null;
+            const lateralidade_otologica_codigo = phase.oticLaterality ?? null;
+            const lateralidade_ocular_label = toOcularLateralityLabel(lateralidade_ocular_codigo);
+            const lateralidade_otologica_label =
+              toOticLateralityLabel(lateralidade_otologica_codigo);
+            const via_administracao_label = toViaAdministracaoLabel(
+              medication.medicationSnapshot.administrationRoute,
+              lateralidade_ocular_label,
+              lateralidade_otologica_label,
+            );
             const conflito = this.mapConflito(dose);
             const contexto_horario: ContextoHorarioAgendadoDto = {
               ancora: dose.anchor ?? null,
@@ -462,6 +474,11 @@ export class SchedulingService {
               uso_continuo: dose.continuousUse,
               uso_se_necessario: dose.isPrn,
               motivo_se_necessario: dose.prnReason ?? null,
+              lateralidade_ocular_codigo,
+              lateralidade_ocular_label,
+              lateralidade_otologica_codigo,
+              lateralidade_otologica_label,
+              via_administracao_label,
               status_codigo: dose.status,
               status_label: toStatusLabel(dose.status),
               orientacao_clinica: dose.clinicalInstructionLabel ?? null,
@@ -472,6 +489,16 @@ export class SchedulingService {
           });
 
         const primeiraDose = phaseDoses[0];
+        const lateralidade_ocular_codigo = phase.ocularLaterality ?? null;
+        const lateralidade_otologica_codigo = phase.oticLaterality ?? null;
+        const lateralidade_ocular_label = toOcularLateralityLabel(lateralidade_ocular_codigo);
+        const lateralidade_otologica_label =
+          toOticLateralityLabel(lateralidade_otologica_codigo);
+        const via_administracao_label = toViaAdministracaoLabel(
+          medication.medicationSnapshot.administrationRoute,
+          lateralidade_ocular_label,
+          lateralidade_otologica_label,
+        );
 
         return {
           fase_ordem: phase.phaseOrder,
@@ -479,6 +506,11 @@ export class SchedulingService {
           data_inicio: toPtBrDate(primeiraDose?.startDate),
           data_fim: toPtBrDate(primeiraDose?.endDate),
           uso_continuo: phase.continuousUse,
+          lateralidade_ocular_codigo,
+          lateralidade_ocular_label,
+          lateralidade_otologica_codigo,
+          lateralidade_otologica_label,
+          via_administracao_label,
           entradas: phaseEntries,
         };
       });
@@ -596,6 +628,42 @@ function toPrnReasonLabel(prnReason?: PrnReason): string {
     default:
       return 'necessidade clínica';
   }
+}
+
+function toOcularLateralityLabel(laterality: OcularLaterality | null): string | null {
+  switch (laterality) {
+    case OcularLaterality.RIGHT_EYE:
+      return 'olho direito';
+    case OcularLaterality.LEFT_EYE:
+      return 'olho esquerdo';
+    case OcularLaterality.BOTH_EYES:
+      return 'ambos os olhos';
+    default:
+      return null;
+  }
+}
+
+function toOticLateralityLabel(laterality: OticLaterality | null): string | null {
+  switch (laterality) {
+    case OticLaterality.RIGHT_EAR:
+      return 'orelha direita';
+    case OticLaterality.LEFT_EAR:
+      return 'orelha esquerda';
+    case OticLaterality.BOTH_EARS:
+      return 'nas 2 orelhas';
+    default:
+      return null;
+  }
+}
+
+function toViaAdministracaoLabel(
+  viaAdministracao: string,
+  ocularLabel: string | null,
+  oticLabel: string | null,
+): string {
+  if (ocularLabel) return `Via ocular - ${ocularLabel}`;
+  if (oticLabel) return `Via otológica - ${oticLabel}`;
+  return viaAdministracao;
 }
 
 function shiftDateByDays(dateString: string, days: number): string {

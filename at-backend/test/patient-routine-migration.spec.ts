@@ -34,6 +34,8 @@ describe('BaselineClinicalCatalogAndPatientPrescriptions1763406000000', () => {
         expect.stringContaining('"windowBeforeMinutes" integer'),
         expect.stringContaining('"windowAfterMinutes" integer'),
         expect.stringContaining('"anchor" character varying(30)'),
+        expect.stringContaining('"ocularLaterality" character varying(30)'),
+        expect.stringContaining('"oticLaterality" character varying(30)'),
         expect.stringContaining('"originalTimeInMinutes" integer NOT NULL'),
         expect.stringContaining('"conflictInteractionType" character varying(40)'),
         expect.stringContaining('"timeFormatted" time NOT NULL'),

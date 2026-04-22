@@ -15,6 +15,8 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { DoseUnit } from '../../../common/enums/dose-unit.enum';
+import { OcularLaterality } from '../../../common/enums/ocular-laterality.enum';
+import { OticLaterality } from '../../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
 import { IsHhmmTime } from '../../../common/validators/is-hhmm-time.validator';
@@ -109,6 +111,14 @@ export class CreatePatientPrescriptionPhaseDto {
   @IsOptional()
   @IsEnum(PrnReason)
   prnReason?: PrnReason;
+
+  @IsOptional()
+  @IsEnum(OcularLaterality)
+  ocularLaterality?: OcularLaterality;
+
+  @IsOptional()
+  @IsEnum(OticLaterality)
+  oticLaterality?: OticLaterality;
 
   @IsBoolean()
   manualAdjustmentEnabled: boolean;
