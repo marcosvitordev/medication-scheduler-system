@@ -331,6 +331,8 @@ function toLegacyRecurrenceLabel(label: string): string {
     .replace('Se necessário: febre', 'Se necessario: fever')
     .replace('Se necessário: dor', 'Se necessario: pain')
     .replace('Se necessário: crise', 'Se necessario: crisis')
+    .replace('Se necessário: náusea e vômito', 'Se necessario: nausea_and_vomiting')
+    .replace('Se necessário: falta de ar', 'Se necessario: shortness_of_breath')
     .replace('Se necessário', 'Se necessario');
 }
 

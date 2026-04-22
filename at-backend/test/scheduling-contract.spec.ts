@@ -5,6 +5,7 @@ import { GroupCode } from '../src/common/enums/group-code.enum';
 import { MonthlySpecialReference } from '../src/common/enums/monthly-special-reference.enum';
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
+import { PrnReason } from '../src/common/enums/prn-reason.enum';
 import { ScheduleStatus } from '../src/common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import {
@@ -485,6 +486,37 @@ describe('SchedulingService final schedule JSON contract', () => {
       deslocamento_dias: 8,
       data_referencia_regra: '28/02/2026',
       descricao_regra_mensal: 'Mensal: 8 dias após início da menstruação.',
+    });
+  });
+
+  it('returns readable PRN labels for expanded reasons in schedule JSON', async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: 'DIPIRONA',
+          activePrinciple: 'Dipirona monoidratada',
+          presentation: 'Comprimido 500 mg',
+          administrationRoute: 'Via oral',
+          usageInstructions: 'Usar se necessário.',
+        },
+        phases: [
+          buildPhase({
+            frequency: 1,
+            recurrenceType: TreatmentRecurrence.PRN,
+            prnReason: PrnReason.NAUSEA_VOMITING,
+            treatmentDays: undefined,
+          }),
+        ],
+      }),
+    ]);
+
+    const entry = result.medicamentos[0].fases[0].entradas[0];
+    expect(entry).toMatchObject({
+      recorrencia_codigo: TreatmentRecurrence.PRN,
+      recorrencia_label: 'Se necessário: náusea e vômito',
+      motivo_se_necessario: PrnReason.NAUSEA_VOMITING,
+      orientacao_clinica: 'Uso se necessario em caso de náusea e vômito.',
     });
   });
 });

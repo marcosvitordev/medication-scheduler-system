@@ -5,6 +5,7 @@ import { ClinicalAnchor } from '../src/common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../src/common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
+import { PrnReason } from '../src/common/enums/prn-reason.enum';
 import { MonthlySpecialReference } from '../src/common/enums/monthly-special-reference.enum';
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
@@ -50,6 +51,43 @@ describe('New DTO clinical validation', () => {
         monthlyRule: undefined,
       }),
     ).toContain('monthlyDay ou monthlyRule sao obrigatorios para recorrencia MONTHLY.');
+  });
+
+  it('rejects PRN recurrence without prnReason', () => {
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.PRN,
+        treatmentDays: undefined,
+        prnReason: undefined,
+      }),
+    ).toContain('prnReason e obrigatorio para recorrencia PRN.');
+  });
+
+  it('rejects prnReason outside PRN recurrence', () => {
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.DAILY,
+        prnReason: PrnReason.PAIN,
+      }),
+    ).toContain('prnReason so pode ser usado quando recurrenceType for PRN.');
+  });
+
+  it('accepts expanded PRN reasons', () => {
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.PRN,
+        treatmentDays: undefined,
+        prnReason: PrnReason.NAUSEA_VOMITING,
+      }),
+    ).toHaveLength(0);
+
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.PRN,
+        treatmentDays: undefined,
+        prnReason: PrnReason.SHORTNESS_OF_BREATH,
+      }),
+    ).toHaveLength(0);
   });
 
   it('accepts monthly recurrence with monthlySpecial* payload', () => {

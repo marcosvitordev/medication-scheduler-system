@@ -126,7 +126,28 @@ describe('SchedulingService clinical rules', () => {
       isPrn: true,
       prnReason: PrnReason.FEVER,
       recurrenceLabel: 'Se necessario: fever',
-      clinicalInstructionLabel: 'Uso se necessario em caso de fever.',
+      clinicalInstructionLabel: 'Uso se necessario em caso de febre.',
+    });
+  });
+
+  it('builds PRN labels for nausea and vomiting reason', async () => {
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        phases: [
+          buildPhase({
+            recurrenceType: TreatmentRecurrence.PRN,
+            prnReason: PrnReason.NAUSEA_VOMITING,
+            treatmentDays: undefined,
+          }),
+        ],
+      }),
+    ]);
+
+    expect(flattenEntries(result)[0]).toMatchObject({
+      isPrn: true,
+      prnReason: PrnReason.NAUSEA_VOMITING,
+      recurrenceLabel: 'Se necessario: nausea_and_vomiting',
+      clinicalInstructionLabel: 'Uso se necessario em caso de náusea e vômito.',
     });
   });
 

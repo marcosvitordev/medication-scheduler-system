@@ -287,7 +287,7 @@ export class SchedulingService {
       clinicalInstructionLabel:
         phase.recurrenceType === TreatmentRecurrence.PRN
           ? phase.prnReason
-            ? `Uso se necessario em caso de ${String(phase.prnReason).toLowerCase()}.`
+            ? `Uso se necessario em caso de ${toPrnReasonLabel(phase.prnReason)}.`
             : 'Uso se necessario.'
           : undefined,
       timeInMinutes,
@@ -673,6 +673,10 @@ function toPrnReasonLabel(prnReason?: PrnReason): string {
       return 'dor';
     case PrnReason.FEVER:
       return 'febre';
+    case PrnReason.NAUSEA_VOMITING:
+      return 'náusea e vômito';
+    case PrnReason.SHORTNESS_OF_BREATH:
+      return 'falta de ar';
     default:
       return 'necessidade clínica';
   }

@@ -5,6 +5,7 @@ import {
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
+import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
 import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 
@@ -21,6 +22,7 @@ type PhaseLike = {
   monthlySpecialReference?: MonthlySpecialReference;
   monthlySpecialBaseDate?: string;
   monthlySpecialOffsetDays?: number;
+  prnReason?: PrnReason;
   treatmentDays?: number;
   continuousUse?: boolean;
   manualAdjustmentEnabled?: boolean;
@@ -111,6 +113,14 @@ function getPhaseValidationError(phase: PhaseLike): string | undefined {
     phase.alternateDaysInterval === undefined
   ) {
     return 'alternateDaysInterval e obrigatorio para recorrencia ALTERNATE_DAYS.';
+  }
+
+  if (phase.recurrenceType === TreatmentRecurrence.PRN && !phase.prnReason) {
+    return 'prnReason e obrigatorio para recorrencia PRN.';
+  }
+
+  if (phase.recurrenceType !== TreatmentRecurrence.PRN && phase.prnReason) {
+    return 'prnReason so pode ser usado quando recurrenceType for PRN.';
   }
 
   if (
