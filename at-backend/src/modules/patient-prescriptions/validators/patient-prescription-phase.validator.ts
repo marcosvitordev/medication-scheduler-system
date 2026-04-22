@@ -6,6 +6,7 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
+import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 
 type PhaseLike = {
   phaseOrder?: number;
@@ -17,6 +18,9 @@ type PhaseLike = {
   weeklyDay?: string;
   monthlyRule?: string;
   monthlyDay?: number;
+  monthlySpecialReference?: MonthlySpecialReference;
+  monthlySpecialBaseDate?: string;
+  monthlySpecialOffsetDays?: number;
   treatmentDays?: number;
   continuousUse?: boolean;
   manualAdjustmentEnabled?: boolean;
@@ -63,6 +67,12 @@ export function IsPatientPrescriptionPhaseValid(
 }
 
 function getPhaseValidationError(phase: PhaseLike): string | undefined {
+  const hasMonthlySpecialReference = Boolean(phase.monthlySpecialReference);
+  const hasMonthlySpecialBaseDate = Boolean(phase.monthlySpecialBaseDate);
+  const hasMonthlySpecialOffsetDays = phase.monthlySpecialOffsetDays !== undefined;
+  const hasAnyMonthlySpecialRule =
+    hasMonthlySpecialReference || hasMonthlySpecialBaseDate || hasMonthlySpecialOffsetDays;
+
   if ((phase.phaseOrder ?? 0) < 1) {
     return 'phaseOrder deve iniciar em 1.';
   }
@@ -90,7 +100,8 @@ function getPhaseValidationError(phase: PhaseLike): string | undefined {
   if (
     phase.recurrenceType === TreatmentRecurrence.MONTHLY &&
     phase.monthlyDay === undefined &&
-    !phase.monthlyRule
+    !phase.monthlyRule &&
+    !hasAnyMonthlySpecialRule
   ) {
     return 'monthlyDay ou monthlyRule sao obrigatorios para recorrencia MONTHLY.';
   }

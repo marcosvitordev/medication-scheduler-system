@@ -7,6 +7,7 @@ import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../../common/enums/clinical-resolution-type.enum';
 import { ClinicalSemanticTag } from '../../../common/enums/clinical-semantic-tag.enum';
+import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 
 export interface ResolvedScheduleTimeContextDto {
   anchor?: ClinicalAnchor;
@@ -73,6 +74,12 @@ export interface ScheduleEntryDto {
   dia_semanal: string | null;
   regra_mensal: string | null;
   dia_mensal: number | null;
+  regra_mensal_especial_codigo: MonthlySpecialReference | null;
+  regra_mensal_especial_label: string | null;
+  data_base_clinica: string | null;
+  deslocamento_dias: number | null;
+  data_referencia_regra: string | null;
+  descricao_regra_mensal: string | null;
   intervalo_dias_alternados: number | null;
   uso_continuo: boolean;
   uso_se_necessario: boolean;
@@ -98,6 +105,12 @@ export interface ScheduledPhaseDto {
   data_inicio: string | null;
   data_fim: string | null;
   uso_continuo: boolean;
+  regra_mensal_especial_codigo: MonthlySpecialReference | null;
+  regra_mensal_especial_label: string | null;
+  data_base_clinica: string | null;
+  deslocamento_dias: number | null;
+  data_referencia_regra: string | null;
+  descricao_regra_mensal: string | null;
   lateralidade_ocular_codigo: OcularLaterality | null;
   lateralidade_ocular_label: string | null;
   lateralidade_otologica_codigo: OticLaterality | null;

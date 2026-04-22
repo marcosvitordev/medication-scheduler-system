@@ -10,6 +10,7 @@ import { OticLaterality } from '../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../common/enums/prn-reason.enum';
 import { ScheduleStatus } from '../../common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../../common/enums/treatment-recurrence.enum';
+import { MonthlySpecialReference } from '../../common/enums/monthly-special-reference.enum';
 import { calculateEndDate } from '../../common/utils/treatment-window.util';
 import { hhmmToMinutes, minutesToHhmm } from '../../common/utils/time.util';
 import { PatientService } from '../patients/patient.service';
@@ -34,6 +35,15 @@ interface PhaseWindow {
   endDate?: string;
 }
 
+interface MonthlySpecialRule {
+  regra_mensal_especial_codigo: MonthlySpecialReference;
+  regra_mensal_especial_label: string;
+  data_base_clinica: string;
+  deslocamento_dias: number;
+  data_referencia_regra: string;
+  descricao_regra_mensal: string;
+}
+
 interface WorkingEntry extends ConflictEntryLike {
   prescriptionMedication: PatientPrescriptionMedication;
   phase: PatientPrescriptionPhase;
@@ -52,6 +62,11 @@ interface WorkingEntry extends ConflictEntryLike {
   weeklyDay?: string;
   monthlyRule?: string;
   monthlyDay?: number;
+  monthlySpecialReference?: MonthlySpecialReference;
+  monthlySpecialBaseDate?: string;
+  monthlySpecialOffsetDays?: number;
+  monthlySpecialReferenceDate?: string;
+  monthlySpecialRuleDescription?: string;
   alternateDaysInterval?: number;
   continuousUse: boolean;
   isPrn: boolean;
@@ -232,6 +247,7 @@ export class SchedulingService {
     note?: string,
   ): WorkingEntry {
     const administration = this.resolveAdministration(phase, doseLabel);
+    const monthlySpecialRule = toMonthlySpecialRule(phase);
 
     return {
       prescriptionMedication: medication,
@@ -257,8 +273,13 @@ export class SchedulingService {
       startDate: phaseWindow.startDate,
       endDate: phaseWindow.endDate,
       weeklyDay: phase.weeklyDay,
-      monthlyRule: phase.monthlyRule,
-      monthlyDay: phase.monthlyDay,
+      monthlyRule: monthlySpecialRule?.descricao_regra_mensal ?? phase.monthlyRule,
+      monthlyDay: monthlySpecialRule ? undefined : phase.monthlyDay,
+      monthlySpecialReference: monthlySpecialRule?.regra_mensal_especial_codigo,
+      monthlySpecialBaseDate: monthlySpecialRule?.data_base_clinica,
+      monthlySpecialOffsetDays: monthlySpecialRule?.deslocamento_dias,
+      monthlySpecialReferenceDate: monthlySpecialRule?.data_referencia_regra,
+      monthlySpecialRuleDescription: monthlySpecialRule?.descricao_regra_mensal,
       alternateDaysInterval: phase.alternateDaysInterval,
       continuousUse: phase.continuousUse,
       isPrn: phase.recurrenceType === TreatmentRecurrence.PRN,
@@ -433,6 +454,7 @@ export class SchedulingService {
           .sort((a, b) => a.timeInMinutes - b.timeInMinutes);
         const escala_glicemica = toGlycemiaScaleRanges(phase.glycemiaScaleRanges);
         const escala_glicemica_label = toGlycemiaScaleLabel(escala_glicemica);
+        const monthlySpecialRule = toMonthlySpecialRule(phase);
 
         const phaseEntries = phaseDoses.map((dose): ScheduleEntryDto => {
             const recorrencia_label = formatRecurrenceLabel(
@@ -471,8 +493,16 @@ export class SchedulingService {
               recorrencia_codigo: dose.recurrenceType ?? null,
               recorrencia_label,
               dia_semanal: dose.weeklyDay ?? null,
-              regra_mensal: dose.monthlyRule ?? null,
-              dia_mensal: dose.monthlyDay ?? null,
+              regra_mensal: monthlySpecialRule?.descricao_regra_mensal ?? dose.monthlyRule ?? null,
+              dia_mensal: monthlySpecialRule ? null : dose.monthlyDay ?? null,
+              regra_mensal_especial_codigo:
+                monthlySpecialRule?.regra_mensal_especial_codigo ?? null,
+              regra_mensal_especial_label:
+                monthlySpecialRule?.regra_mensal_especial_label ?? null,
+              data_base_clinica: monthlySpecialRule?.data_base_clinica ?? null,
+              deslocamento_dias: monthlySpecialRule?.deslocamento_dias ?? null,
+              data_referencia_regra: monthlySpecialRule?.data_referencia_regra ?? null,
+              descricao_regra_mensal: monthlySpecialRule?.descricao_regra_mensal ?? null,
               intervalo_dias_alternados: dose.alternateDaysInterval ?? null,
               uso_continuo: dose.continuousUse,
               uso_se_necessario: dose.isPrn,
@@ -511,6 +541,12 @@ export class SchedulingService {
           data_inicio: toPtBrDate(primeiraDose?.startDate),
           data_fim: toPtBrDate(primeiraDose?.endDate),
           uso_continuo: phase.continuousUse,
+          regra_mensal_especial_codigo: monthlySpecialRule?.regra_mensal_especial_codigo ?? null,
+          regra_mensal_especial_label: monthlySpecialRule?.regra_mensal_especial_label ?? null,
+          data_base_clinica: monthlySpecialRule?.data_base_clinica ?? null,
+          deslocamento_dias: monthlySpecialRule?.deslocamento_dias ?? null,
+          data_referencia_regra: monthlySpecialRule?.data_referencia_regra ?? null,
+          descricao_regra_mensal: monthlySpecialRule?.descricao_regra_mensal ?? null,
           lateralidade_ocular_codigo,
           lateralidade_ocular_label,
           lateralidade_otologica_codigo,
@@ -548,6 +584,11 @@ function formatRecurrenceLabel(
   endDate: string | undefined,
   phase: PatientPrescriptionPhase,
 ): string {
+  if (recurrenceType === TreatmentRecurrence.MONTHLY) {
+    const monthlySpecialRule = toMonthlySpecialRule(phase);
+    if (monthlySpecialRule) return monthlySpecialRule.descricao_regra_mensal;
+  }
+
   if (phase.continuousUse) {
     return 'Uso contínuo';
   }
@@ -671,6 +712,47 @@ function toViaAdministracaoLabel(
   if (ocularLabel) return `Via ocular - ${ocularLabel}`;
   if (oticLabel) return `Via otológica - ${oticLabel}`;
   return viaAdministracao;
+}
+
+function toMonthlySpecialRule(phase: PatientPrescriptionPhase): MonthlySpecialRule | null {
+  if (
+    !phase.monthlySpecialReference ||
+    !phase.monthlySpecialBaseDate ||
+    phase.monthlySpecialOffsetDays === undefined
+  ) {
+    return null;
+  }
+  const dataBaseClinica = toPtBrDate(phase.monthlySpecialBaseDate);
+  const monthlyReferenceDate = shiftDateByDays(
+    phase.monthlySpecialBaseDate,
+    phase.monthlySpecialOffsetDays,
+  );
+  const dataReferenciaRegra = toPtBrDate(monthlyReferenceDate);
+
+  if (!dataBaseClinica || !dataReferenciaRegra) {
+    return null;
+  }
+
+  return {
+    regra_mensal_especial_codigo: phase.monthlySpecialReference,
+    regra_mensal_especial_label: toMonthlySpecialReferenceLabel(phase.monthlySpecialReference),
+    data_base_clinica: dataBaseClinica,
+    deslocamento_dias: phase.monthlySpecialOffsetDays,
+    data_referencia_regra: dataReferenciaRegra,
+    descricao_regra_mensal: toMonthlySpecialDescription(phase.monthlySpecialOffsetDays),
+  };
+}
+
+function toMonthlySpecialReferenceLabel(reference: MonthlySpecialReference): string {
+  switch (reference) {
+    case MonthlySpecialReference.MENSTRUATION_START:
+    default:
+      return 'Início da menstruação';
+  }
+}
+
+function toMonthlySpecialDescription(offsetDays: number): string {
+  return `Mensal: ${offsetDays} dias após início da menstruação.`;
 }
 
 function toGlycemiaScaleRanges(

@@ -5,6 +5,7 @@ import { ClinicalAnchor } from '../src/common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../src/common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
+import { MonthlySpecialReference } from '../src/common/enums/monthly-special-reference.enum';
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
@@ -49,6 +50,49 @@ describe('New DTO clinical validation', () => {
         monthlyRule: undefined,
       }),
     ).toContain('monthlyDay ou monthlyRule sao obrigatorios para recorrencia MONTHLY.');
+  });
+
+  it('accepts monthly recurrence with monthlySpecial* payload', () => {
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.MONTHLY,
+        monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+        monthlySpecialBaseDate: '2026-02-20',
+        monthlySpecialOffsetDays: 8,
+        monthlyDay: undefined,
+        monthlyRule: undefined,
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('rejects invalid monthlySpecialReference enum value', () => {
+    const errors = validatePhase({
+      recurrenceType: TreatmentRecurrence.MONTHLY,
+      monthlySpecialReference: 'INVALID' as MonthlySpecialReference,
+      monthlySpecialBaseDate: '2026-02-20',
+      monthlySpecialOffsetDays: 8,
+    });
+    expect(errors.some((message) => message.includes('monthlySpecialReference'))).toBe(true);
+  });
+
+  it('rejects invalid monthlySpecialBaseDate', () => {
+    const errors = validatePhase({
+      recurrenceType: TreatmentRecurrence.MONTHLY,
+      monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+      monthlySpecialBaseDate: '20/02/2026',
+      monthlySpecialOffsetDays: 8,
+    });
+    expect(errors.some((message) => message.includes('monthlySpecialBaseDate'))).toBe(true);
+  });
+
+  it('rejects invalid monthlySpecialOffsetDays', () => {
+    const errors = validatePhase({
+      recurrenceType: TreatmentRecurrence.MONTHLY,
+      monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+      monthlySpecialBaseDate: '2026-02-20',
+      monthlySpecialOffsetDays: -1,
+    });
+    expect(errors.some((message) => message.includes('monthlySpecialOffsetDays'))).toBe(true);
   });
 
   it('rejects manual adjustment without manualTimes', () => {

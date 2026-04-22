@@ -4,6 +4,7 @@ import { OcularLaterality } from '../../../common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
+import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 import {
   PrescriptionPhaseDoseOverride,
   PrescriptionPhaseGlycemiaScaleRange,
@@ -54,6 +55,15 @@ export class PatientPrescriptionPhase {
 
   @Column({ type: 'int', nullable: true })
   monthlyDay?: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  monthlySpecialReference?: MonthlySpecialReference;
+
+  @Column({ type: 'date', nullable: true })
+  monthlySpecialBaseDate?: string;
+
+  @Column({ type: 'int', nullable: true })
+  monthlySpecialOffsetDays?: number;
 
   @Column({ type: 'int', nullable: true })
   alternateDaysInterval?: number;

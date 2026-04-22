@@ -2,6 +2,7 @@ import { ClinicalInteractionType } from '../src/common/enums/clinical-interactio
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
+import { MonthlySpecialReference } from '../src/common/enums/monthly-special-reference.enum';
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { ScheduleStatus } from '../src/common/enums/schedule-status.enum';
@@ -76,6 +77,12 @@ describe('SchedulingService final schedule JSON contract', () => {
       data_inicio: '20/02/2026',
       data_fim: '26/02/2026',
       uso_continuo: false,
+      regra_mensal_especial_codigo: null,
+      regra_mensal_especial_label: null,
+      data_base_clinica: null,
+      deslocamento_dias: null,
+      data_referencia_regra: null,
+      descricao_regra_mensal: null,
       lateralidade_ocular_codigo: null,
       lateralidade_ocular_label: null,
       lateralidade_otologica_codigo: null,
@@ -97,6 +104,12 @@ describe('SchedulingService final schedule JSON contract', () => {
       horario: '07:00',
       recorrencia_codigo: TreatmentRecurrence.DAILY,
       recorrencia_label: expect.any(String),
+      regra_mensal_especial_codigo: null,
+      regra_mensal_especial_label: null,
+      data_base_clinica: null,
+      deslocamento_dias: null,
+      data_referencia_regra: null,
+      descricao_regra_mensal: null,
       lateralidade_ocular_codigo: null,
       lateralidade_ocular_label: null,
       lateralidade_otologica_codigo: null,
@@ -415,6 +428,63 @@ describe('SchedulingService final schedule JSON contract', () => {
     phase.entradas.forEach((entry) => {
       expect(entry.escala_glicemica).toEqual(phase.escala_glicemica);
       expect(entry.escala_glicemica_label).toBe(phase.escala_glicemica_label);
+    });
+  });
+
+  it('returns monthly special rule fields for PERLUTAN-equivalent contraceptive monthly', async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: 'PERLUTAN',
+          activePrinciple: 'Algestona acetofenida + enantato de estradiol',
+          presentation: 'Ampola 1 ml',
+          administrationRoute: 'Via intramuscular',
+          usageInstructions:
+            'Administrar no 8º dia após início da menstruação.',
+          isContraceptiveMonthly: true,
+        },
+        phases: [
+          buildPhase({
+            frequency: 1,
+            doseAmount: '1 ML',
+            doseValue: '1',
+            doseUnit: DoseUnit.ML,
+            recurrenceType: TreatmentRecurrence.MONTHLY,
+            continuousUse: true,
+            treatmentDays: undefined,
+            monthlyDay: undefined,
+            monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+            monthlySpecialBaseDate: '2026-02-20',
+            monthlySpecialOffsetDays: 8,
+          }),
+        ],
+      }),
+    ]);
+
+    const phase = result.medicamentos[0].fases[0];
+    const entry = phase.entradas[0];
+
+    expect(phase).toMatchObject({
+      regra_mensal_especial_codigo: MonthlySpecialReference.MENSTRUATION_START,
+      regra_mensal_especial_label: 'Início da menstruação',
+      data_base_clinica: '20/02/2026',
+      deslocamento_dias: 8,
+      data_referencia_regra: '28/02/2026',
+      descricao_regra_mensal: 'Mensal: 8 dias após início da menstruação.',
+    });
+
+    expect(entry).toMatchObject({
+      recorrencia_codigo: TreatmentRecurrence.MONTHLY,
+      recorrencia_label: 'Mensal: 8 dias após início da menstruação.',
+      regra_mensal: 'Mensal: 8 dias após início da menstruação.',
+      dia_mensal: null,
+      regra_mensal_especial_codigo: MonthlySpecialReference.MENSTRUATION_START,
+      regra_mensal_especial_label: 'Início da menstruação',
+      data_base_clinica: '20/02/2026',
+      deslocamento_dias: 8,
+      data_referencia_regra: '28/02/2026',
+      descricao_regra_mensal: 'Mensal: 8 dias após início da menstruação.',
     });
   });
 });

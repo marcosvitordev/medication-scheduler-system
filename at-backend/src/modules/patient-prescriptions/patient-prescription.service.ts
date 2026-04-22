@@ -57,6 +57,7 @@ export class PatientPrescriptionService {
           this.ensureSequentialPhaseOrders(medicationDto.phases);
           this.ensureLateralityCompatibility(clinicalMedication, medicationDto.phases);
           this.ensureGlycemiaScaleCompatibility(clinicalMedication, medicationDto.phases);
+          this.ensureContraceptiveMonthlyCompatibility(clinicalMedication, medicationDto.phases);
           this.ensureProtocolSupportsPhases(
             protocolSnapshotFromEntity(protocol),
             medicationDto.phases,
@@ -297,6 +298,49 @@ export class PatientPrescriptionService {
       if (range.minimum !== previousRange.maximum + 1) {
         throw new UnprocessableEntityException(
           `glycemiaScaleRanges inválida no medicamento ${medicationId} fase ${phaseOrder}: faixas com lacuna.`,
+        );
+      }
+    });
+  }
+
+  private ensureContraceptiveMonthlyCompatibility(
+    medication: Awaited<ReturnType<ClinicalCatalogService['findMedicationById']>>,
+    phases: CreatePatientPrescriptionDto['medications'][number]['phases'],
+  ): void {
+    const isContraceptiveMonthly = Boolean(medication.isContraceptiveMonthly);
+
+    phases.forEach((phase) => {
+      const hasMonthlySpecialFields =
+        Boolean(phase.monthlySpecialReference) ||
+        Boolean(phase.monthlySpecialBaseDate) ||
+        phase.monthlySpecialOffsetDays !== undefined;
+
+      if (isContraceptiveMonthly) {
+        if (phase.recurrenceType !== TreatmentRecurrence.MONTHLY) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} exige recorrência MONTHLY na fase ${phase.phaseOrder}.`,
+          );
+        }
+        if (
+          !phase.monthlySpecialReference ||
+          !phase.monthlySpecialBaseDate ||
+          phase.monthlySpecialOffsetDays === undefined
+        ) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} exige monthlySpecialReference, monthlySpecialBaseDate e monthlySpecialOffsetDays na fase ${phase.phaseOrder}.`,
+          );
+        }
+        if (phase.monthlyDay !== undefined) {
+          throw new UnprocessableEntityException(
+            `Medicamento ${medication.id} contraceptivo mensal não aceita monthlyDay na fase ${phase.phaseOrder}.`,
+          );
+        }
+        return;
+      }
+
+      if (hasMonthlySpecialFields) {
+        throw new UnprocessableEntityException(
+          `Medicamento ${medication.id} não aceita monthlySpecial* na fase ${phase.phaseOrder}.`,
         );
       }
     });

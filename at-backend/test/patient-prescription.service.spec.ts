@@ -6,6 +6,7 @@ import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-
 import { ClinicalSemanticTag } from '../src/common/enums/clinical-semantic-tag.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
+import { MonthlySpecialReference } from '../src/common/enums/monthly-special-reference.enum';
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
@@ -1316,6 +1317,133 @@ describe('PatientPrescriptionService', () => {
                 glycemiaScaleRanges: [
                   { minimum: 180, maximum: 140, doseValue: '2', doseUnit: DoseUnit.UI },
                 ],
+              }),
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('accepts monthly contraceptive equivalent with monthly special rule (PERLUTAN equivalent)', async () => {
+    const { service, prescriptionRepository, schedulingService, clinicalCatalogService } =
+      createService();
+
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      commercialName: 'PERLUTAN',
+      isContraceptiveMonthly: true,
+    });
+    mockLoadedPrescriptionForLaterality(prescriptionRepository, {
+      recurrenceType: TreatmentRecurrence.MONTHLY,
+      monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+      monthlySpecialBaseDate: '2026-02-20',
+      monthlySpecialOffsetDays: 8,
+      monthlyDay: undefined,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              buildPhasePayload({
+                recurrenceType: TreatmentRecurrence.MONTHLY,
+                monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+                monthlySpecialBaseDate: '2026-02-20',
+                monthlySpecialOffsetDays: 8,
+                monthlyDay: undefined,
+              }),
+            ],
+          },
+        ],
+      }),
+    ).resolves.toBeDefined();
+
+    expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
+  });
+
+  it('rejects monthly contraceptive without monthly special rule', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isContraceptiveMonthly: true,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              buildPhasePayload({
+                recurrenceType: TreatmentRecurrence.MONTHLY,
+              }),
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects monthly contraceptive when monthlyDay is provided', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isContraceptiveMonthly: true,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              buildPhasePayload({
+                recurrenceType: TreatmentRecurrence.MONTHLY,
+                monthlyDay: 8,
+                monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+                monthlySpecialBaseDate: '2026-02-20',
+                monthlySpecialOffsetDays: 8,
+              }),
+            ],
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+  });
+
+  it('rejects monthly special fields for non-contraceptive medication', async () => {
+    const { service, clinicalCatalogService } = createService();
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      ...buildClinicalMedicationWithProtocol(),
+      isContraceptiveMonthly: false,
+    });
+
+    await expect(
+      service.create({
+        patientId: 'patient-1',
+        startedAt: '2026-04-21',
+        medications: [
+          {
+            clinicalMedicationId: 'clinical-1',
+            protocolId: 'protocol-1',
+            phases: [
+              buildPhasePayload({
+                recurrenceType: TreatmentRecurrence.MONTHLY,
+                monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+                monthlySpecialBaseDate: '2026-02-20',
+                monthlySpecialOffsetDays: 8,
               }),
             ],
           },

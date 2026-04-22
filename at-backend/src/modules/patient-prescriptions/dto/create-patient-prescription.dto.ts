@@ -19,6 +19,7 @@ import { OcularLaterality } from '../../../common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../../../common/enums/otic-laterality.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
+import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 import { IsHhmmTime } from '../../../common/validators/is-hhmm-time.validator';
 import { IsPatientPrescriptionPhaseValid } from '../validators/patient-prescription-phase.validator';
 
@@ -117,6 +118,20 @@ export class CreatePatientPrescriptionPhaseDto {
   @Min(1)
   @Max(31)
   monthlyDay?: number;
+
+  @IsOptional()
+  @IsEnum(MonthlySpecialReference)
+  monthlySpecialReference?: MonthlySpecialReference;
+
+  @IsOptional()
+  @IsDateString()
+  monthlySpecialBaseDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  monthlySpecialOffsetDays?: number;
 
   @IsOptional()
   @Type(() => Number)
