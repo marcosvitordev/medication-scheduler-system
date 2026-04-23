@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { ClinicalSemanticTag } from '../../../common/enums/clinical-semantic-tag.enum';
 import { ClinicalProtocolFrequency } from './clinical-protocol-frequency.entity';
@@ -12,6 +12,7 @@ export class ClinicalProtocolStep {
     onDelete: 'CASCADE',
     orphanedRowAction: 'delete',
   })
+  @JoinColumn({ name: 'frequencyId' })
   frequencyConfig: ClinicalProtocolFrequency;
 
   @Column()
