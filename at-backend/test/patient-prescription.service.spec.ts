@@ -618,6 +618,158 @@ describe('PatientPrescriptionService', () => {
     ).rejects.toBeInstanceOf(UnprocessableEntityException);
   });
 
+  it('accepts weekly bifosfonate prescription using the default BIFOS protocol', async () => {
+    const { service, prescriptionRepository, schedulingService, clinicalCatalogService } =
+      createService();
+
+    clinicalCatalogService.findMedicationById.mockResolvedValue({
+      id: 'clinical-bifos',
+      commercialName: 'ALENDRONATO',
+      activePrinciple: 'Alendronato de sodio',
+      presentation: 'Comprimido',
+      administrationRoute: 'VO',
+      usageInstructions: 'Administrar em jejum com agua.',
+      protocols: [
+        {
+          id: 'protocol-bifos',
+          code: 'GROUP_II_BIFOS_STANDARD',
+          name: 'Grupo II Bifosfonatos',
+          description: 'Protocolos para bifosfonatos em jejum.',
+          priority: 0,
+          isDefault: true,
+          group: { code: GroupCode.GROUP_II_BIFOS },
+          frequencies: [
+            {
+              frequency: 1,
+              label: '1x por semana',
+              allowedRecurrenceTypes: [
+                TreatmentRecurrence.DAILY,
+                TreatmentRecurrence.WEEKLY,
+              ],
+              steps: [
+                {
+                  doseLabel: 'D1',
+                  anchor: ClinicalAnchor.ACORDAR,
+                  offsetMinutes: -60,
+                  semanticTag: ClinicalSemanticTag.STANDARD,
+                },
+              ],
+            },
+          ],
+          interactionRules: [],
+        },
+      ],
+    });
+    prescriptionRepository.findOne.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      id: where.id,
+      patient: { id: 'patient-1' },
+      medications: [
+        {
+          id: 'prescription-medication-1',
+          sourceClinicalMedicationId: 'clinical-bifos',
+          sourceProtocolId: 'protocol-bifos',
+          medicationSnapshot: {
+            id: 'clinical-bifos',
+            commercialName: 'ALENDRONATO',
+            activePrinciple: 'Alendronato de sodio',
+            presentation: 'Comprimido',
+            administrationRoute: 'VO',
+            usageInstructions: 'Administrar em jejum com agua.',
+          },
+          protocolSnapshot: {
+            id: 'protocol-bifos',
+            code: 'GROUP_II_BIFOS_STANDARD',
+            name: 'Grupo II Bifosfonatos',
+            description: 'Protocolos para bifosfonatos em jejum.',
+            groupCode: GroupCode.GROUP_II_BIFOS,
+            priority: 0,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                label: '1x por semana',
+                allowedRecurrenceTypes: [
+                  TreatmentRecurrence.DAILY,
+                  TreatmentRecurrence.WEEKLY,
+                ],
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ACORDAR,
+                    offsetMinutes: -60,
+                    semanticTag: ClinicalSemanticTag.STANDARD,
+                  },
+                ],
+              },
+            ],
+          },
+          interactionRulesSnapshot: [],
+          phases: [
+            {
+              id: 'phase-1',
+              phaseOrder: 1,
+              frequency: 1,
+              sameDosePerSchedule: true,
+              doseAmount: '1 COMP',
+              doseValue: '1',
+              doseUnit: DoseUnit.COMP,
+              recurrenceType: TreatmentRecurrence.WEEKLY,
+              weeklyDay: 'SEGUNDA',
+              treatmentDays: 30,
+              continuousUse: false,
+              manualAdjustmentEnabled: false,
+            },
+          ],
+        },
+      ],
+    }));
+
+    await service.create({
+      patientId: 'patient-1',
+      startedAt: '2026-04-21',
+      medications: [
+        {
+          clinicalMedicationId: 'clinical-bifos',
+          protocolId: 'protocol-bifos',
+          phases: [
+            {
+              phaseOrder: 1,
+              frequency: 1,
+              sameDosePerSchedule: true,
+              doseAmount: '1 COMP',
+              doseValue: '1',
+              doseUnit: DoseUnit.COMP,
+              recurrenceType: TreatmentRecurrence.WEEKLY,
+              weeklyDay: 'SEGUNDA',
+              treatmentDays: 30,
+              continuousUse: false,
+              manualAdjustmentEnabled: false,
+            } as never,
+          ],
+        },
+      ],
+    });
+
+    expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
+    const scheduledPrescription = schedulingService.buildAndPersistSchedule.mock.calls[0][0];
+    expect(scheduledPrescription.medications[0]).toMatchObject({
+      medicationSnapshot: {
+        commercialName: 'ALENDRONATO',
+      },
+      protocolSnapshot: {
+        code: 'GROUP_II_BIFOS_STANDARD',
+        groupCode: GroupCode.GROUP_II_BIFOS,
+      },
+      phases: [
+        expect.objectContaining({
+          frequency: 1,
+          recurrenceType: TreatmentRecurrence.WEEKLY,
+          weeklyDay: 'SEGUNDA',
+        }),
+      ],
+    });
+  });
+
   it('rejects PRN when the protocol frequency does not allow it', async () => {
     const { service, clinicalCatalogService } = createService();
 

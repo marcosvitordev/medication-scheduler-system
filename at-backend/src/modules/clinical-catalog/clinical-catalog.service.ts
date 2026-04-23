@@ -473,8 +473,11 @@ export class ClinicalCatalogService {
             frequencies: [
               {
                 frequency: 1,
-                label: '1x ao dia',
-                allowedRecurrenceTypes: [TreatmentRecurrence.DAILY],
+                label: '1x por semana',
+                allowedRecurrenceTypes: [
+                  TreatmentRecurrence.DAILY,
+                  TreatmentRecurrence.WEEKLY,
+                ],
                 steps: [
                   {
                     doseLabel: 'D1',

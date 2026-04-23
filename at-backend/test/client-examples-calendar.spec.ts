@@ -86,6 +86,46 @@ describe('Client document calendar examples', () => {
     });
   }
 
+  it('ALENDRONATO renders weekly BIFOS schedule at one hour before waking', async () => {
+    const { service } = createSchedulingService({ routine: standardRoutine });
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: 'ALENDRONATO',
+          activePrinciple: 'Alendronato de sodio',
+          presentation: 'Comprimido',
+          administrationRoute: 'VO',
+          usageInstructions: 'Administrar em jejum com agua.',
+        },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_II_BIFOS),
+        phases: [
+          buildPhase({
+            frequency: 1,
+            recurrenceType: TreatmentRecurrence.WEEKLY,
+            weeklyDay: 'SEGUNDA',
+            treatmentDays: 30,
+            doseValue: '1',
+            doseUnit: DoseUnit.COMP,
+          }),
+        ],
+      }),
+    ]);
+
+    const alendronato = item(result, 'ALENDRONATO');
+    expect(alendronato).toMatchObject({
+      recorrenciaTexto: 'Semanal: segunda-feira',
+    });
+    expect(alendronato.doses).toEqual([
+      expect.objectContaining({
+        horario: '05:00',
+        contextoHorario: expect.objectContaining({
+          ancora: ClinicalAnchor.ACORDAR,
+          deslocamento_minutos: -60,
+        }),
+      }),
+    ]);
+  });
+
   it('GANSULIN R renders the rapid-insulin calendar at 30 minutes before meals with glycemia scale text', async () => {
     const { service } = createSchedulingService({ routine: standardRoutine });
     const result = await buildScheduleResult(service, [

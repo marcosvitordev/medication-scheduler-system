@@ -4,6 +4,7 @@ import { ClinicalAnchor } from '../src/common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../src/common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
+import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import { ClinicalCatalogService } from '../src/modules/clinical-catalog/clinical-catalog.service';
 
 describe('ClinicalCatalogService', () => {
@@ -368,6 +369,22 @@ describe('ClinicalCatalogService', () => {
     const protocolsByCode = new Map(protocols.map((protocol) => [protocol.code, protocol]));
 
     expect(protocolsByCode.get('GROUP_II_WAKE')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
+    const bifosFrequency = protocolsByCode.get('GROUP_II_BIFOS_STANDARD')?.frequencies[0];
+    expect(bifosFrequency).toMatchObject({
+      frequency: 1,
+      label: '1x por semana',
+      allowedRecurrenceTypes: [
+        TreatmentRecurrence.DAILY,
+        TreatmentRecurrence.WEEKLY,
+      ],
+    });
+    expect(bifosFrequency?.steps).toEqual([
+      expect.objectContaining({
+        doseLabel: 'D1',
+        anchor: ClinicalAnchor.ACORDAR,
+        offsetMinutes: -60,
+      }),
+    ]);
     expect(protocolsByCode.get('GROUP_I_SIME_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
     expect(protocolsByCode.get('GROUP_II_BEDTIME')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
     expect(protocolsByCode.get('GROUP_II_LUNCH_BEFORE')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
