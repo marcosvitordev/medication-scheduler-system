@@ -14,7 +14,7 @@ export class IsHhmmTimeConstraint implements ValidatorConstraintInterface {
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} deve estar no formato HH:mm com hora entre 00-23 e minuto entre 00-59.`;
+    return `${args.property} deve estar no formato HH:mm com hora entre 00-23 e minuto entre 00-59, ou 24:00.`;
   }
 }
 

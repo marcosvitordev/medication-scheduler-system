@@ -1,8 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
-import { hhmmToMinutes } from '../../common/utils/time.util';
-import { MealAnchor } from '../../common/enums/meal-anchor.enum';
 import { validateRoutine } from '../../common/utils/routine.util';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { CreateRoutineDto } from './dto/create-routine.dto';
@@ -22,14 +20,7 @@ export class PatientService {
   }
 
   async addRoutine(patientId: string, dto: CreateRoutineDto): Promise<PatientRoutine> {
-    validateRoutine({
-      [MealAnchor.ACORDAR]: hhmmToMinutes(dto.acordar),
-      [MealAnchor.CAFE]: hhmmToMinutes(dto.cafe),
-      [MealAnchor.ALMOCO]: hhmmToMinutes(dto.almoco),
-      [MealAnchor.LANCHE]: hhmmToMinutes(dto.lanche),
-      [MealAnchor.JANTAR]: hhmmToMinutes(dto.jantar),
-      [MealAnchor.DORMIR]: hhmmToMinutes(dto.dormir)
-    });
+    validateRoutine(dto);
 
     try {
       return await this.dataSource.transaction(async (manager) => {

@@ -9,22 +9,22 @@ export class PatientRoutine {
   @ManyToOne(() => Patient, (patient) => patient.routines, { onDelete: 'CASCADE' })
   patient: Patient;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   acordar: string;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   cafe: string;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   almoco: string;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   lanche: string;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   jantar: string;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   dormir: string;
 
   @Column({ default: true })

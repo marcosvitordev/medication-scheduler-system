@@ -10,6 +10,7 @@ import {
   buildPhase,
   buildPrescriptionMedication,
   buildProtocolSnapshot,
+  buildRoutine,
   buildScheduleResult,
   createSchedulingService,
   findEntryByTime,
@@ -267,6 +268,94 @@ describe('SchedulingService clinical rules', () => {
       '08:15',
       '20:45',
     ]);
+  });
+
+  it('normalizes coherent manual times across midnight without collapsing 24:00', async () => {
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        phases: [
+          buildPhase({
+            frequency: 4,
+            manualAdjustmentEnabled: true,
+            manualTimes: ['06:00', '12:00', '18:00', '24:00'],
+          }),
+        ],
+      }),
+    ]);
+
+    expect(flattenEntries(result).map((entry) => entry.timeFormatted)).toEqual([
+      '06:00',
+      '12:00',
+      '18:00',
+      '24:00',
+    ]);
+    expect(flattenEntries(result).map((entry) => entry.timeContext.resolvedTimeInMinutes)).toEqual([
+      360,
+      720,
+      1080,
+      1440,
+    ]);
+  });
+
+  it('keeps clinical ordering when dormir belongs to the next day', async () => {
+    const { service: midnightService } = createSchedulingService({
+      routine: buildRoutine({
+        acordar: '05:00',
+        cafe: '07:00',
+        almoco: '12:00',
+        lanche: '16:00',
+        jantar: '19:00',
+        dormir: '01:00',
+      }),
+    });
+
+    const result = await buildScheduleResult(midnightService, [
+      buildPrescriptionMedication({
+        medicationSnapshot: { commercialName: 'LOSARTANA' },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
+        phases: [buildPhase({ frequency: 3 })],
+      }),
+    ]);
+
+    expect(flattenEntries(result).map((entry) => entry.timeFormatted)).toEqual([
+      '07:00',
+      '16:00',
+      '01:00',
+    ]);
+    expect(flattenEntries(result).map((entry) => entry.timeContext.resolvedTimeInMinutes)).toEqual([
+      420,
+      960,
+      1500,
+    ]);
+  });
+
+  it('keeps D4 at 24:00 for the canonical 6/6h scheme', async () => {
+    const { service: midnightBoundaryService } = createSchedulingService({
+      routine: buildRoutine({
+        acordar: '06:00',
+        cafe: '07:00',
+        almoco: '12:00',
+        lanche: '16:00',
+        jantar: '21:00',
+        dormir: '24:00',
+      }),
+    });
+
+    const result = await buildScheduleResult(midnightBoundaryService, [
+      buildPrescriptionMedication({
+        medicationSnapshot: { commercialName: 'DORALGINA' },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
+        phases: [buildPhase({ frequency: 4, treatmentDays: 6 })],
+      }),
+    ]);
+
+    expect(flattenEntries(result).map((entry) => entry.timeFormatted)).toEqual([
+      '06:00',
+      '12:00',
+      '18:00',
+      '24:00',
+    ]);
+    expect(findEntryByTime(result, 'DORALGINA', '24:00')).toBeDefined();
   });
 
   it('fails with a domain exception when no formula exists for the requested frequency', async () => {

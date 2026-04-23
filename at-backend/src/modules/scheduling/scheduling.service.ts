@@ -12,7 +12,12 @@ import { ScheduleStatus } from '../../common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../../common/enums/treatment-recurrence.enum';
 import { MonthlySpecialReference } from '../../common/enums/monthly-special-reference.enum';
 import { calculateEndDate } from '../../common/utils/treatment-window.util';
-import { hhmmToMinutes, minutesToHhmm } from '../../common/utils/time.util';
+import {
+  formatMinuteIndex,
+  minutesToHhmm,
+  normalizeClockSequence,
+  normalizeRoutineTimeline,
+} from '../../common/utils/time.util';
 import { PatientService } from '../patients/patient.service';
 import { PatientRoutine } from '../patients/entities/patient-routine.entity';
 import { PatientPrescriptionMedication } from '../patient-prescriptions/entities/patient-prescription-medication.entity';
@@ -154,13 +159,22 @@ export class SchedulingService {
   private toScheduleAnchors(
     routine: Pick<PatientRoutine, 'acordar' | 'cafe' | 'almoco' | 'lanche' | 'jantar' | 'dormir'>,
   ): ScheduleAnchors {
+    const timeline = normalizeRoutineTimeline({
+      acordar: routine.acordar,
+      cafe: routine.cafe,
+      almoco: routine.almoco,
+      lanche: routine.lanche,
+      jantar: routine.jantar,
+      dormir: routine.dormir,
+    });
+
     return {
-      [ClinicalAnchor.ACORDAR]: hhmmToMinutes(routine.acordar),
-      [ClinicalAnchor.CAFE]: hhmmToMinutes(routine.cafe),
-      [ClinicalAnchor.ALMOCO]: hhmmToMinutes(routine.almoco),
-      [ClinicalAnchor.LANCHE]: hhmmToMinutes(routine.lanche),
-      [ClinicalAnchor.JANTAR]: hhmmToMinutes(routine.jantar),
-      [ClinicalAnchor.DORMIR]: hhmmToMinutes(routine.dormir),
+      [ClinicalAnchor.ACORDAR]: timeline[ClinicalAnchor.ACORDAR],
+      [ClinicalAnchor.CAFE]: timeline[ClinicalAnchor.CAFE],
+      [ClinicalAnchor.ALMOCO]: timeline[ClinicalAnchor.ALMOCO],
+      [ClinicalAnchor.LANCHE]: timeline[ClinicalAnchor.LANCHE],
+      [ClinicalAnchor.JANTAR]: timeline[ClinicalAnchor.JANTAR],
+      [ClinicalAnchor.DORMIR]: timeline[ClinicalAnchor.DORMIR],
       [ClinicalAnchor.MANUAL]: 0,
     };
   }
@@ -239,16 +253,17 @@ export class SchedulingService {
     phaseWindow: PhaseWindow,
   ): WorkingEntry[] {
     if (phase.manualAdjustmentEnabled && phase.manualTimes?.length) {
-      return phase.manualTimes.map((time, index) =>
+      const normalizedManualTimes = normalizeClockSequence(phase.manualTimes);
+      return normalizedManualTimes.map((timeInMinutes, index) =>
         this.createEntry(
           prescription,
           medication,
           phase,
           `D${index + 1}`,
-          hhmmToMinutes(time),
+          timeInMinutes,
           ClinicalSemanticTag.STANDARD,
           ClinicalAnchor.MANUAL,
-          hhmmToMinutes(time),
+          timeInMinutes,
           0,
           phaseWindow,
           'Horário definido manualmente.',
@@ -335,16 +350,16 @@ export class SchedulingService {
             : 'Uso se necessario.'
           : undefined,
       timeInMinutes,
-      timeFormatted: minutesToHhmm(timeInMinutes),
+      timeFormatted: formatMinuteIndex(timeInMinutes),
       timeContext: {
         anchor,
         anchorTimeInMinutes,
         offsetMinutes,
         semanticTag,
         originalTimeInMinutes: timeInMinutes,
-        originalTimeFormatted: minutesToHhmm(timeInMinutes),
+        originalTimeFormatted: formatMinuteIndex(timeInMinutes),
         resolvedTimeInMinutes: timeInMinutes,
-        resolvedTimeFormatted: minutesToHhmm(timeInMinutes),
+        resolvedTimeFormatted: formatMinuteIndex(timeInMinutes),
       },
       status: ScheduleStatus.ACTIVE,
       note,

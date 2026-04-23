@@ -74,7 +74,7 @@ export class ScheduledDose {
   @Column({ type: 'int' })
   timeInMinutes: number;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   timeFormatted: string;
 
   @Column({ type: 'varchar', length: 30, nullable: true })
@@ -92,7 +92,7 @@ export class ScheduledDose {
   @Column({ type: 'int' })
   originalTimeInMinutes: number;
 
-  @Column({ type: 'time' })
+  @Column({ type: 'varchar', length: 5 })
   originalTimeFormatted: string;
 
   @Column({ type: 'varchar', length: 30, default: 'ACTIVE' })
