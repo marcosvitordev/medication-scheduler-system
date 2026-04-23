@@ -141,10 +141,21 @@ describe('ClinicalCatalogService', () => {
       GroupCode.GROUP_II_BIFOS,
       GroupCode.GROUP_II_SUCRA,
       GroupCode.GROUP_III,
+      GroupCode.GROUP_III_LAX,
       GroupCode.GROUP_III_MET,
+      GroupCode.GROUP_III_ESTAT,
+      GroupCode.GROUP_III_DIU,
+      GroupCode.GROUP_III_SUL,
+      GroupCode.GROUP_III_SUL2,
+      GroupCode.GROUP_III_PROC,
       GroupCode.GROUP_III_SAL,
       GroupCode.GROUP_III_CALC,
+      GroupCode.GROUP_III_FER,
       GroupCode.GROUP_I_SED,
+      GroupCode.GROUP_INSUL_ULTRA,
+      GroupCode.GROUP_INSUL_RAPIDA,
+      GroupCode.GROUP_INSUL_INTER,
+      GroupCode.GROUP_INSUL_LONGA,
       GroupCode.GROUP_DELTA,
     ].map((code) => ({ id: `${code}-id`, code }));
 
@@ -163,7 +174,18 @@ describe('ClinicalCatalogService', () => {
     expect(savedGroups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ code: GroupCode.GROUP_I }),
+        expect.objectContaining({ code: GroupCode.GROUP_II }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_LAX }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_ESTAT }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_DIU }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_SUL }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_SUL2 }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_PROC }),
         expect.objectContaining({ code: GroupCode.GROUP_III_SAL }),
+        expect.objectContaining({ code: GroupCode.GROUP_III_FER }),
+        expect.objectContaining({ code: GroupCode.GROUP_INSUL_ULTRA }),
+        expect.objectContaining({ code: GroupCode.GROUP_INSUL_INTER }),
+        expect.objectContaining({ code: GroupCode.GROUP_INSUL_LONGA }),
         expect.objectContaining({ code: GroupCode.GROUP_DELTA }),
       ]),
     );
@@ -187,6 +209,81 @@ describe('ClinicalCatalogService', () => {
           ]),
         }),
         expect.objectContaining({
+          commercialName: 'MEDICAMENTO GRUPO II',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_II_WAKE' }),
+            expect.objectContaining({ code: 'GROUP_II_BEDTIME' }),
+            expect.objectContaining({ code: 'GROUP_II_LUNCH_BEFORE' }),
+            expect.objectContaining({ code: 'GROUP_II_LUNCH_AFTER' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'BISACODIL',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({
+              code: 'GROUP_III_LAX_STANDARD',
+              frequencies: expect.arrayContaining([
+                expect.objectContaining({ frequency: 1 }),
+                expect.objectContaining({ frequency: 2 }),
+              ]),
+            }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'FUROSEMIDA',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_III_DIU_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'GLICLAZIDA',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_III_SUL_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'GLIBENCLAMIDA',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_III_SUL2_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'DOMPERIDONA',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_III_PROC_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'NORIPURUM',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_III_FER_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'NOVORAPID',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_INSUL_ULTRA_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'GANSULIN R',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_INSUL_RAPIDA_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'INSULINA NPH',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_INSUL_INTER_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
+          commercialName: 'LANTUS',
+          protocols: expect.arrayContaining([
+            expect.objectContaining({ code: 'GROUP_INSUL_LONGA_STANDARD' }),
+          ]),
+        }),
+        expect.objectContaining({
           commercialName: 'METRONIDAZOL',
           protocols: expect.arrayContaining([
             expect.objectContaining({ code: 'DELTA_METRONIDAZOL_VAGINAL' }),
@@ -194,5 +291,39 @@ describe('ClinicalCatalogService', () => {
         }),
       ]),
     );
+  });
+
+  it('seeds every documented default protocol family with its expected frequencies', async () => {
+    const { service, groupRepository, medicationRepository } = createService();
+    const allGroups = Object.values(GroupCode).map((code) => ({ id: `${code}-id`, code }));
+
+    groupRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(allGroups);
+    medicationRepository.find.mockResolvedValue([]);
+
+    await service.seedCatalog();
+
+    const flattenedSavedMedications = medicationRepository.save.mock.calls.flatMap((call) =>
+      Array.isArray(call[0]) ? call[0] : [call[0]],
+    );
+    const protocols = flattenedSavedMedications.flatMap((medication) => medication.protocols ?? []);
+    const protocolsByCode = new Map(protocols.map((protocol) => [protocol.code, protocol]));
+
+    expect(protocolsByCode.get('GROUP_II_WAKE')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
+    expect(protocolsByCode.get('GROUP_II_BEDTIME')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
+    expect(protocolsByCode.get('GROUP_II_LUNCH_BEFORE')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
+    expect(protocolsByCode.get('GROUP_II_LUNCH_AFTER')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
+    expect(protocolsByCode.get('GROUP_III_LAX_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2]);
+    expect(protocolsByCode.get('GROUP_III_ESTAT_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
+    expect(protocolsByCode.get('GROUP_III_DIU_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2]);
+    expect(protocolsByCode.get('GROUP_III_SUL_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
+    expect(protocolsByCode.get('GROUP_III_SUL2_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
+    expect(protocolsByCode.get('GROUP_III_PROC_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3]);
+    expect(protocolsByCode.get('GROUP_III_FER_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
+    expect(protocolsByCode.get('GROUP_INSUL_ULTRA_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3, 4]);
+    expect(protocolsByCode.get('GROUP_INSUL_RAPIDA_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2, 3, 4]);
+    expect(protocolsByCode.get('GROUP_INSUL_INTER_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1, 2]);
+    expect(protocolsByCode.get('GROUP_INSUL_LONGA_STANDARD')?.frequencies.map((frequency) => frequency.frequency)).toEqual([1]);
   });
 });

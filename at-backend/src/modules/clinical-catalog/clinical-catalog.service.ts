@@ -110,9 +110,39 @@ export class ClinicalCatalogService {
         description: 'Medicamentos relacionados às refeições.',
       },
       {
+        code: GroupCode.GROUP_III_LAX,
+        name: 'Grupo III - Lax',
+        description: 'Laxativos pós-refeição e ao dormir.',
+      },
+      {
         code: GroupCode.GROUP_III_MET,
         name: 'Grupo III - Met',
         description: 'Medicamento junto às refeições principais.',
+      },
+      {
+        code: GroupCode.GROUP_III_ESTAT,
+        name: 'Grupo III - Estat',
+        description: 'Estatinas ao jantar.',
+      },
+      {
+        code: GroupCode.GROUP_III_DIU,
+        name: 'Grupo III - Diu',
+        description: 'Diuréticos alinhados a café e lanche.',
+      },
+      {
+        code: GroupCode.GROUP_III_SUL,
+        name: 'Grupo III - Sul',
+        description: 'Sulfonilureias nas refeições principais.',
+      },
+      {
+        code: GroupCode.GROUP_III_SUL2,
+        name: 'Grupo III - Sul 2',
+        description: 'Sulfonilureias 30 minutos antes das refeições.',
+      },
+      {
+        code: GroupCode.GROUP_III_PROC,
+        name: 'Grupo III - Proc',
+        description: 'Procinéticos 20 minutos antes das refeições.',
       },
       {
         code: GroupCode.GROUP_III_SAL,
@@ -125,9 +155,34 @@ export class ClinicalCatalogService {
         description: 'Cálcio com possível deslocamento de 1 hora.',
       },
       {
+        code: GroupCode.GROUP_III_FER,
+        name: 'Grupo III - Fer',
+        description: 'Ferro 30 minutos antes do almoço.',
+      },
+      {
         code: GroupCode.GROUP_I_SED,
         name: 'Grupo I - Sed',
         description: '20 minutos antes de dormir.',
+      },
+      {
+        code: GroupCode.GROUP_INSUL_ULTRA,
+        name: 'Grupo Insul - Ultra',
+        description: 'Insulina subcutânea ultra-rápida.',
+      },
+      {
+        code: GroupCode.GROUP_INSUL_RAPIDA,
+        name: 'Grupo Insul - Rápida',
+        description: 'Insulina subcutânea rápida.',
+      },
+      {
+        code: GroupCode.GROUP_INSUL_INTER,
+        name: 'Grupo Insul - Inter',
+        description: 'Insulina subcutânea intermediária.',
+      },
+      {
+        code: GroupCode.GROUP_INSUL_LONGA,
+        name: 'Grupo Insul - Longa',
+        description: 'Insulina subcutânea de longa ação.',
       },
       {
         code: GroupCode.GROUP_DELTA,
@@ -358,6 +413,127 @@ export class ClinicalCatalogService {
         ],
       },
       {
+        commercialName: 'MEDICAMENTO GRUPO II',
+        activePrinciple: 'Fármaco em jejum com famílias de fórmulas clínicas',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar em jejum conforme a família clínica selecionada.',
+        protocols: [
+          {
+            code: 'GROUP_II_WAKE',
+            name: 'Grupo II - Jejum ao acordar',
+            description: 'Família clínica com início ao acordar.',
+            groupCode: GroupCode.GROUP_II,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ACORDAR,
+                    offsetMinutes: 0,
+                  },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ACORDAR,
+                    offsetMinutes: 0,
+                  },
+                  {
+                    doseLabel: 'D2',
+                    anchor: ClinicalAnchor.JANTAR,
+                    offsetMinutes: -60,
+                  },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ACORDAR,
+                    offsetMinutes: 0,
+                  },
+                  {
+                    doseLabel: 'D2',
+                    anchor: ClinicalAnchor.LANCHE,
+                    offsetMinutes: -60,
+                  },
+                  {
+                    doseLabel: 'D3',
+                    anchor: ClinicalAnchor.DORMIR,
+                    offsetMinutes: 0,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            code: 'GROUP_II_BEDTIME',
+            name: 'Grupo II - Ao dormir',
+            description: 'Família clínica administrada no horário de dormir.',
+            groupCode: GroupCode.GROUP_II,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.DORMIR,
+                    offsetMinutes: 0,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            code: 'GROUP_II_LUNCH_BEFORE',
+            name: 'Grupo II - Almoço menos 1 hora',
+            description: 'Família clínica administrada 1 hora antes do almoço.',
+            groupCode: GroupCode.GROUP_II,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ALMOCO,
+                    offsetMinutes: -60,
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            code: 'GROUP_II_LUNCH_AFTER',
+            name: 'Grupo II - Almoço mais 2 horas',
+            description: 'Família clínica administrada 2 horas após o almoço.',
+            groupCode: GroupCode.GROUP_II,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.ALMOCO,
+                    offsetMinutes: 120,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
         commercialName: 'GLIFAGE',
         activePrinciple: 'Metformina',
         presentation: 'Comprimido revestido',
@@ -479,6 +655,215 @@ export class ClinicalCatalogService {
                     anchor: ClinicalAnchor.DORMIR,
                     offsetMinutes: 0,
                   },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'BISACODIL',
+        activePrinciple: 'Bisacodil',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar afastado das refeições conforme protocolo.',
+        protocols: [
+          {
+            code: 'GROUP_III_LAX_STANDARD',
+            name: 'Grupo III Lax',
+            description: 'Laxante pós-café e ao dormir.',
+            groupCode: GroupCode.GROUP_III_LAX,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 120 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 120 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.DORMIR, offsetMinutes: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'SINVASTATINA',
+        activePrinciple: 'Sinvastatina',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar ao jantar.',
+        protocols: [
+          {
+            code: 'GROUP_III_ESTAT_STANDARD',
+            name: 'Grupo III Estat',
+            description: 'Estatina ao jantar.',
+            groupCode: GroupCode.GROUP_III_ESTAT,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.JANTAR, offsetMinutes: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'FUROSEMIDA',
+        activePrinciple: 'Furosemida',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar preferencialmente pela manhã e à tarde.',
+        protocols: [
+          {
+            code: 'GROUP_III_DIU_STANDARD',
+            name: 'Grupo III Diu',
+            description: 'Diurético alinhado a café e lanche.',
+            groupCode: GroupCode.GROUP_III_DIU,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.LANCHE, offsetMinutes: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'GLICLAZIDA',
+        activePrinciple: 'Gliclazida',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar junto das refeições principais.',
+        protocols: [
+          {
+            code: 'GROUP_III_SUL_STANDARD',
+            name: 'Grupo III Sul',
+            description: 'Sulfonilureia nas refeições principais.',
+            groupCode: GroupCode.GROUP_III_SUL,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: 0 },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: 0 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.JANTAR, offsetMinutes: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'GLIBENCLAMIDA',
+        activePrinciple: 'Glibenclamida',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar 30 minutos antes das refeições.',
+        protocols: [
+          {
+            code: 'GROUP_III_SUL2_STANDARD',
+            name: 'Grupo III Sul 2',
+            description: 'Sulfonilureia 30 minutos antes das refeições.',
+            groupCode: GroupCode.GROUP_III_SUL2,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -30 },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: -30 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -30 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'DOMPERIDONA',
+        activePrinciple: 'Domperidona',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar 20 minutos antes das refeições.',
+        protocols: [
+          {
+            code: 'GROUP_III_PROC_STANDARD',
+            name: 'Grupo III Proc',
+            description: 'Procinético antes das refeições principais.',
+            groupCode: GroupCode.GROUP_III_PROC,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -20 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -20 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -20 },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -20 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: -20 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -20 },
                 ],
               },
             ],
@@ -609,6 +994,188 @@ export class ClinicalCatalogService {
                 windowMinutes: 20,
                 priority: 100,
                 applicableSemanticTags: [ClinicalSemanticTag.BEDTIME_EQUIVALENT],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'NORIPURUM',
+        activePrinciple: 'Ferro',
+        presentation: 'Comprimido',
+        pharmaceuticalForm: 'Comprimido',
+        administrationRoute: 'VO',
+        usageInstructions: 'Administrar 30 minutos antes do almoço.',
+        protocols: [
+          {
+            code: 'GROUP_III_FER_STANDARD',
+            name: 'Grupo III Fer',
+            description: 'Ferro antes do almoço.',
+            groupCode: GroupCode.GROUP_III_FER,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: -30 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'NOVORAPID',
+        activePrinciple: 'Insulina Aspart',
+        presentation: 'Caneta 3 ml',
+        pharmaceuticalForm: 'Solução injetável',
+        administrationRoute: 'SC',
+        usageInstructions: 'Aplicar por via subcutânea conforme refeições.',
+        requiresGlycemiaScale: true,
+        protocols: [
+          {
+            code: 'GROUP_INSUL_ULTRA_STANDARD',
+            name: 'Grupo Insul Ultra',
+            description: 'Insulina ultra-rápida subcutânea.',
+            groupCode: GroupCode.GROUP_INSUL_ULTRA,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -10 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -10 },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -10 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.LANCHE, offsetMinutes: -10 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -10 },
+                ],
+              },
+              {
+                frequency: 4,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -10 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: -10 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.LANCHE, offsetMinutes: -10 },
+                  { doseLabel: 'D4', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -10 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'GANSULIN R',
+        activePrinciple: 'Insulina Humana Regular 100 UI/ml',
+        presentation: 'Frasco com 100 ml',
+        pharmaceuticalForm: 'Solução injetável',
+        administrationRoute: 'SC',
+        usageInstructions: 'Aplicar por via subcutânea 30 minutos antes das refeições.',
+        requiresGlycemiaScale: true,
+        protocols: [
+          {
+            code: 'GROUP_INSUL_RAPIDA_STANDARD',
+            name: 'Grupo Insul Rápida',
+            description: 'Insulina rápida subcutânea antes das refeições.',
+            groupCode: GroupCode.GROUP_INSUL_RAPIDA,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -30 },
+                ],
+              },
+              {
+                frequency: 3,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.LANCHE, offsetMinutes: -30 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -30 },
+                ],
+              },
+              {
+                frequency: 4,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: -30 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.ALMOCO, offsetMinutes: -30 },
+                  { doseLabel: 'D3', anchor: ClinicalAnchor.LANCHE, offsetMinutes: -30 },
+                  { doseLabel: 'D4', anchor: ClinicalAnchor.JANTAR, offsetMinutes: -30 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'INSULINA NPH',
+        activePrinciple: 'Insulina humana NPH',
+        presentation: 'Frasco 10 ml',
+        pharmaceuticalForm: 'Solução injetável',
+        administrationRoute: 'SC',
+        usageInstructions: 'Aplicar por via subcutânea conforme rotina.',
+        protocols: [
+          {
+            code: 'GROUP_INSUL_INTER_STANDARD',
+            name: 'Grupo Insul Inter',
+            description: 'Insulina intermediária subcutânea.',
+            groupCode: GroupCode.GROUP_INSUL_INTER,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                ],
+              },
+              {
+                frequency: 2,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                  { doseLabel: 'D2', anchor: ClinicalAnchor.JANTAR, offsetMinutes: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      {
+        commercialName: 'LANTUS',
+        activePrinciple: 'Insulina Glargina 100 UI/ml',
+        presentation: 'Frasco contendo 3 ml + caneta',
+        pharmaceuticalForm: 'Solução injetável',
+        administrationRoute: 'SC',
+        usageInstructions: 'Aplicar por via subcutânea uma vez ao dia.',
+        protocols: [
+          {
+            code: 'GROUP_INSUL_LONGA_STANDARD',
+            name: 'Grupo Insul Longa',
+            description: 'Insulina de longa ação subcutânea.',
+            groupCode: GroupCode.GROUP_INSUL_LONGA,
+            isDefault: true,
+            frequencies: [
+              {
+                frequency: 1,
+                steps: [
+                  { doseLabel: 'D1', anchor: ClinicalAnchor.CAFE, offsetMinutes: 0 },
+                ],
               },
             ],
           },

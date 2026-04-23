@@ -202,8 +202,36 @@ function buildDefaultFrequencies(groupCode: string) {
         ],
       },
     ],
+    [GroupCode.GROUP_II]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.ACORDAR, 0)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.ACORDAR, 0),
+          step("D2", ClinicalAnchor.JANTAR, -60),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.ACORDAR, 0),
+          step("D2", ClinicalAnchor.LANCHE, -60),
+          step("D3", ClinicalAnchor.DORMIR, 0),
+        ],
+      },
+    ],
     [GroupCode.GROUP_II_BIFOS]: [
       { frequency: 1, steps: [step("D1", ClinicalAnchor.ACORDAR, -60)] },
+    ],
+    [GroupCode.GROUP_III_LAX]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 120)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 120),
+          step("D2", ClinicalAnchor.DORMIR, 0),
+        ],
+      },
     ],
     [GroupCode.GROUP_III_MET]: [
       { frequency: 1, steps: [step("D1", ClinicalAnchor.JANTAR, 0)] },
@@ -220,6 +248,73 @@ function buildDefaultFrequencies(groupCode: string) {
           step("D1", ClinicalAnchor.CAFE, 0),
           step("D2", ClinicalAnchor.ALMOCO, 0),
           step("D3", ClinicalAnchor.JANTAR, 0),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_III_ESTAT]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.JANTAR, 0)] },
+    ],
+    [GroupCode.GROUP_III_DIU]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 0),
+          step("D2", ClinicalAnchor.LANCHE, 0),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_III_SUL]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 0),
+          step("D2", ClinicalAnchor.JANTAR, 0),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 0),
+          step("D2", ClinicalAnchor.ALMOCO, 0),
+          step("D3", ClinicalAnchor.JANTAR, 0),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_III_SUL2]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, -30)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -30),
+          step("D2", ClinicalAnchor.JANTAR, -30),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -30),
+          step("D2", ClinicalAnchor.ALMOCO, -30),
+          step("D3", ClinicalAnchor.JANTAR, -30),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_III_PROC]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, -20)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -20),
+          step("D2", ClinicalAnchor.JANTAR, -20),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -20),
+          step("D2", ClinicalAnchor.ALMOCO, -20),
+          step("D3", ClinicalAnchor.JANTAR, -20),
         ],
       },
     ],
@@ -266,6 +361,9 @@ function buildDefaultFrequencies(groupCode: string) {
         ],
       },
     ],
+    [GroupCode.GROUP_III_FER]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.ALMOCO, -30)] },
+    ],
     [GroupCode.GROUP_I_SED]: [
       {
         frequency: 1,
@@ -278,6 +376,73 @@ function buildDefaultFrequencies(groupCode: string) {
           ),
         ],
       },
+    ],
+    [GroupCode.GROUP_INSUL_ULTRA]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -10),
+          step("D2", ClinicalAnchor.JANTAR, -10),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -10),
+          step("D2", ClinicalAnchor.LANCHE, -10),
+          step("D3", ClinicalAnchor.JANTAR, -10),
+        ],
+      },
+      {
+        frequency: 4,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -10),
+          step("D2", ClinicalAnchor.ALMOCO, -10),
+          step("D3", ClinicalAnchor.LANCHE, -10),
+          step("D4", ClinicalAnchor.JANTAR, -10),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_INSUL_RAPIDA]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, -30)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -30),
+          step("D2", ClinicalAnchor.JANTAR, -30),
+        ],
+      },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -30),
+          step("D2", ClinicalAnchor.LANCHE, -30),
+          step("D3", ClinicalAnchor.JANTAR, -30),
+        ],
+      },
+      {
+        frequency: 4,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, -30),
+          step("D2", ClinicalAnchor.ALMOCO, -30),
+          step("D3", ClinicalAnchor.LANCHE, -30),
+          step("D4", ClinicalAnchor.JANTAR, -30),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_INSUL_INTER]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
+      {
+        frequency: 2,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 0),
+          step("D2", ClinicalAnchor.JANTAR, 0),
+        ],
+      },
+    ],
+    [GroupCode.GROUP_INSUL_LONGA]: [
+      { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
     ],
     [GroupCode.GROUP_III]: [
       { frequency: 1, steps: [step("D1", ClinicalAnchor.CAFE, 0)] },
