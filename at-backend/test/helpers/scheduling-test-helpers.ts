@@ -232,6 +232,14 @@ function buildDefaultFrequencies(groupCode: string) {
           step("D2", ClinicalAnchor.DORMIR, 0),
         ],
       },
+      {
+        frequency: 3,
+        steps: [
+          step("D1", ClinicalAnchor.CAFE, 120),
+          step("D2", ClinicalAnchor.ALMOCO, 120),
+          step("D3", ClinicalAnchor.DORMIR, 0),
+        ],
+      },
     ],
     [GroupCode.GROUP_II_SUCRA]: [
       { frequency: 1, steps: [step("D1", ClinicalAnchor.ACORDAR, 120)] },

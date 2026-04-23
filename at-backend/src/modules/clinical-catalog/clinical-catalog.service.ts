@@ -461,6 +461,26 @@ export class ClinicalCatalogService {
                   },
                 ],
               },
+              {
+                frequency: 3,
+                steps: [
+                  {
+                    doseLabel: 'D1',
+                    anchor: ClinicalAnchor.CAFE,
+                    offsetMinutes: 120,
+                  },
+                  {
+                    doseLabel: 'D2',
+                    anchor: ClinicalAnchor.ALMOCO,
+                    offsetMinutes: 120,
+                  },
+                  {
+                    doseLabel: 'D3',
+                    anchor: ClinicalAnchor.DORMIR,
+                    offsetMinutes: 0,
+                  },
+                ],
+              },
             ],
           },
         ],
