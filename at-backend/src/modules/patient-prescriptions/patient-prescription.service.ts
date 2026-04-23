@@ -787,7 +787,6 @@ export class PatientPrescriptionService {
     const isOtic = Boolean(medication.isOtic);
     const requiresGlycemiaScale = Boolean(medication.requiresGlycemiaScale);
     const isContraceptiveMonthly = Boolean(medication.isContraceptiveMonthly);
-    const supportsManualAdjustment = Boolean(medication.supportsManualAdjustment);
 
     if (isOphthalmic && isOtic) {
       this.throwMedicationDomainError(
@@ -805,11 +804,7 @@ export class PatientPrescriptionService {
         phase,
         isContraceptiveMonthly,
       );
-      this.ensureManualAdjustmentCompatibilityForPhase(
-        medication.id,
-        phase,
-        supportsManualAdjustment,
-      );
+      this.ensureManualAdjustmentCompatibilityForPhase(medication.id, phase);
     });
   }
 
@@ -1019,18 +1014,7 @@ export class PatientPrescriptionService {
   private ensureManualAdjustmentCompatibilityForPhase(
     medicationId: string,
     phase: PrescriptionMedicationPhaseDto,
-    supportsManualAdjustment: boolean,
   ): void {
-    if (phase.manualAdjustmentEnabled && !supportsManualAdjustment) {
-      this.throwPhaseDomainError(
-        medicationId,
-        phase.phaseOrder,
-        'manualAdjustmentEnabled=true',
-        'é inválido',
-        'supportsManualAdjustment=false',
-      );
-    }
-
     if (!phase.manualAdjustmentEnabled && phase.manualTimes !== undefined) {
       this.throwPhaseDomainError(
         medicationId,

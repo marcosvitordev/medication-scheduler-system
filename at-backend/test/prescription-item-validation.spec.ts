@@ -154,6 +154,16 @@ describe('New DTO clinical validation', () => {
     ).toContain('manualTimes e obrigatorio quando manualAdjustmentEnabled for true.');
   });
 
+  it('rejects manual adjustment when manualTimes count differs from frequency', () => {
+    expect(
+      validatePhase({
+        frequency: 2,
+        manualAdjustmentEnabled: true,
+        manualTimes: ['08:00'],
+      }),
+    ).toContain('manualTimes deve corresponder exatamente a frequencia da fase.');
+  });
+
   it('rejects variable dose without complete D1..Dn coverage', () => {
     expect(
       validatePhase({

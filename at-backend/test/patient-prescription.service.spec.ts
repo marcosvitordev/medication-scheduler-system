@@ -2016,14 +2016,19 @@ describe('PatientPrescriptionService', () => {
     expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
   });
 
-  it('rejects manualAdjustmentEnabled=true when medication does not support manual adjustment with detailed message', async () => {
-    const { service, clinicalCatalogService } = createService();
+  it('accepts manualAdjustmentEnabled=true when medication does not support manual adjustment', async () => {
+    const { service, prescriptionRepository, schedulingService, clinicalCatalogService } =
+      createService();
     clinicalCatalogService.findMedicationById.mockResolvedValue({
       ...buildClinicalMedicationWithProtocol(),
       supportsManualAdjustment: false,
     });
+    mockLoadedPrescriptionForLaterality(prescriptionRepository, {
+      manualAdjustmentEnabled: true,
+      manualTimes: ['08:00'],
+    });
 
-    await expectDomainErrorMessage(
+    await expect(
       service.create({
         patientId: 'patient-1',
         startedAt: '2026-04-21',
@@ -2040,8 +2045,9 @@ describe('PatientPrescriptionService', () => {
           },
         ],
       }),
-      'Fase 1: manualAdjustmentEnabled=true é inválido para medicamento clinical-1 (supportsManualAdjustment=false).',
-    );
+    ).resolves.toBeDefined();
+
+    expect(schedulingService.buildAndPersistSchedule).toHaveBeenCalled();
   });
 
   it('rejects manualTimes when manualAdjustmentEnabled=false with detailed message', async () => {

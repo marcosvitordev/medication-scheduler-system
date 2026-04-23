@@ -268,6 +268,15 @@ describe('SchedulingService clinical rules', () => {
       '08:15',
       '20:45',
     ]);
+    expect(flattenEntries(result).map((entry) => entry.timeContext.anchor)).toEqual([
+      ClinicalAnchor.MANUAL,
+      ClinicalAnchor.MANUAL,
+    ]);
+    expect(flattenEntries(result).map((entry) => entry.timeContext.offsetMinutes)).toEqual([
+      0,
+      0,
+    ]);
+    expect(result.scheduleItems[0].modoUso).toContain('Horários definidos manualmente.');
   });
 
   it('normalizes coherent manual times across midnight without collapsing 24:00', async () => {
