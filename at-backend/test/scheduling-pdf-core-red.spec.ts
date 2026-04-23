@@ -198,7 +198,7 @@ describe('SchedulingService PDF core rules', () => {
       });
     });
 
-    it('keeps SUCRAFILM fixed and marks LOSARTANA as manual when the shifted slot still falls inside another sucralfate window', async () => {
+    it('moves SUCRAFILM D1 to ALMOCO + 2h when another medication occupies the morning slot', async () => {
       const { service } = createSchedulingService({ routine });
 
       const morningInteractor = buildPrescriptionMedication({
@@ -235,29 +235,29 @@ describe('SchedulingService PDF core rules', () => {
         morningInteractor,
       ]);
 
-      const movedEntry = findEntryByTime(result, 'LOSARTANA', '15:00');
-      expect(movedEntry?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      const movedEntry = findEntryByTime(result, 'SUCRAFILM', '15:00');
+      expect(movedEntry?.status).toBe(ScheduleStatus.ACTIVE);
       expect(movedEntry?.reasonCode).toBe(
-        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+        ConflictReasonCode.SHIFTED_BY_WINDOW_CONFLICT,
       );
+      expect(movedEntry?.reasonText).toContain('ALMOÇO + 2H');
       expect(movedEntry?.timeContext.originalTimeFormatted).toBe('08:00');
       expect(movedEntry?.timeContext.resolvedTimeFormatted).toBe('15:00');
       expect(movedEntry?.conflict).toMatchObject({
         interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
         resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
-        triggerMedicationName: 'SUCRAFILM',
+        triggerMedicationName: 'LOSARTANA',
         windowAfterMinutes: 420,
       });
-      expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
-        administrationLabel: '10 ML',
+      expectEntry(findEntryByTime(result, 'LOSARTANA', '08:00'), {
+        administrationLabel: '1 COMP',
       });
-      expect(findEntriesByMedicationAndTime(result, 'LOSARTANA', '15:00')).toHaveLength(1);
       expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
     });
 
-    it('treats GROUP_I_SED at 20:40 as clinically equivalent to bedtime and inactivates CLONAZEPAM instead of SUCRAFILM', async () => {
+    it('treats GROUP_I_SED at 20:40 as clinically equivalent to bedtime and inactivates SUCRAFILM', async () => {
       const { service } = createSchedulingService({ routine });
 
       const clonazepam = buildPrescriptionMedication({
@@ -284,15 +284,19 @@ describe('SchedulingService PDF core rules', () => {
         clonazepam,
       ]);
 
-      expectInactiveEntry(findEntryByTime(result, 'CLONAZEPAM', '20:40'), {
+      expectEntry(findEntryByTime(result, 'CLONAZEPAM', '20:40'), {
         administrationLabel: '1 COMP',
       });
-      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+      const sucralfato = findEntryByTime(result, 'SUCRAFILM', '21:00');
+      expectInactiveEntry(sucralfato, {
         administrationLabel: '10 ML',
       });
+      expect(sucralfato?.reasonCode).toBe(
+        ConflictReasonCode.INACTIVATED_BY_MANDATORY_RULE,
+      );
     });
 
-    it('keeps SUCRAFILM fixed and manualizes the shifted morning blocker when the afternoon window remains clinically conflicting', async () => {
+    it('inactivates shifted SUCRAFILM D1 when ALMOCO + 2h is also conflicting', async () => {
       const { service } = createSchedulingService({ routine });
 
       const morningBlock = buildPrescriptionMedication({
@@ -356,25 +360,25 @@ describe('SchedulingService PDF core rules', () => {
         afternoonBlock,
       ]);
 
-      const shiftedMorning = findEntryByTime(result, 'LOSARTANA MANHA', '15:00');
-      expect(shiftedMorning?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
-      expect(shiftedMorning?.reasonCode).toBe(
-        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      const shiftedSucralfate = findEntryByTime(result, 'SUCRAFILM', '15:00');
+      expect(shiftedSucralfate?.status).toBe(ScheduleStatus.INACTIVE);
+      expect(shiftedSucralfate?.reasonCode).toBe(
+        ConflictReasonCode.INACTIVATED_BY_MANDATORY_RULE,
       );
-      expect(shiftedMorning?.timeContext.originalTimeFormatted).toBe('08:00');
-      expect(shiftedMorning?.timeContext.resolvedTimeFormatted).toBe('15:00');
-      expect(shiftedMorning?.conflict).toMatchObject({
+      expect(shiftedSucralfate?.timeContext.originalTimeFormatted).toBe('08:00');
+      expect(shiftedSucralfate?.timeContext.resolvedTimeFormatted).toBe('15:00');
+      expect(shiftedSucralfate?.conflict).toMatchObject({
         interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
-        resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
-        triggerMedicationName: 'SUCRAFILM',
+        resolutionType: ClinicalResolutionType.INACTIVATE_SOURCE,
+        matchKind: ConflictMatchKind.MANDATORY_INACTIVATION,
+        triggerMedicationName: 'LOSARTANA TARDE',
       });
-      expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
-        administrationLabel: '10 ML',
-      });
+      expectEntry(findEntryByTime(result, 'LOSARTANA MANHA', '08:00'), {});
+      expectEntry(findEntryByTime(result, 'LOSARTANA TARDE', '15:00'), {});
       expect(findEntriesByMedication(result, 'SUCRAFILM')).toHaveLength(2);
     });
 
-    it('keeps SUCRAFILM fixed and inactivates only the bedtime blocker when the conflict exists at 21:00', async () => {
+    it('inactivates SUCRAFILM D2 when another medication occupies bedtime', async () => {
       const { service } = createSchedulingService({ routine });
 
       const bedtimeConflict = buildPrescriptionMedication({
@@ -418,10 +422,10 @@ describe('SchedulingService PDF core rules', () => {
       expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
         administrationLabel: '10 ML',
       });
-      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+      expectInactiveEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
-      expectInactiveEntry(findEntryByTime(result, 'ZOLPIDEM', '21:00'), {
+      expectEntry(findEntryByTime(result, 'ZOLPIDEM', '21:00'), {
         administrationLabel: '1 COMP',
       });
     });
@@ -881,7 +885,7 @@ describe('SchedulingService PDF core rules', () => {
       dormir: '21:00',
     });
 
-    it('keeps SUCRAFILM fixed and inactivates the bedtime-equivalent blocker when the rule window is 30', async () => {
+    it('inactivates SUCRAFILM when the bedtime-equivalent conflict is inside the configured window', async () => {
       const { service } = createSchedulingService({ routine });
 
       const sucralfato = buildPrescriptionMedication({
@@ -941,10 +945,10 @@ describe('SchedulingService PDF core rules', () => {
 
       const result = await buildScheduleResult(service, [sucralfato, sedativo]);
 
-      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+      expectInactiveEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
-      expectInactiveEntry(findEntryByTime(result, 'SEDATIVO TESTE', '20:31'), {
+      expectEntry(findEntryByTime(result, 'SEDATIVO TESTE', '20:31'), {
         administrationLabel: '1 COMP',
       });
     });

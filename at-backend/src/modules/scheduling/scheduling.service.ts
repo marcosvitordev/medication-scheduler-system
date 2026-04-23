@@ -133,7 +133,7 @@ export class SchedulingService {
     const scheduleContext =
       await this.resolveScheduleContextForBuild(prescription);
     let entries = this.buildBaseEntries(prescription, scheduleContext.anchors);
-    entries = this.applyConflictRules(entries);
+    entries = this.applyConflictRules(entries, scheduleContext.anchors);
     entries = entries.map((entry) => ({
       ...entry,
       timeFormatted: formatMinuteIndex(entry.timeInMinutes),
@@ -466,9 +466,12 @@ export class SchedulingService {
     };
   }
 
-  private applyConflictRules(entries: WorkingEntry[]): WorkingEntry[] {
+  private applyConflictRules(
+    entries: WorkingEntry[],
+    anchors: ScheduleAnchors,
+  ): WorkingEntry[] {
     const normalized = entries.map((entry) => ({ ...entry }));
-    this.conflictResolutionService.apply(normalized);
+    this.conflictResolutionService.apply(normalized, { anchors });
     return normalized;
   }
 

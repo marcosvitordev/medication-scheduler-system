@@ -45,7 +45,7 @@ describe('ConflictResolutionService', () => {
     const entries = Array.from({ length: 9 }, (_, index) => {
       const timeInMinutes = 420 + index;
       return [
-        buildEntry(`BLOCKER-${index}`, GroupCode.GROUP_II_SUCRA, timeInMinutes),
+        buildEntry(`BLOCKER-${index}`, GroupCode.GROUP_II_BIFOS, timeInMinutes),
         buildEntry(`MOVABLE-${index}`, GroupCode.GROUP_I, timeInMinutes),
       ];
     }).flat();

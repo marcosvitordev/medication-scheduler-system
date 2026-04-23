@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { GroupCode } from '../../../common/enums/group-code.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../../common/enums/clinical-resolution-type.enum';
@@ -12,12 +13,17 @@ import { ScheduleConflictDto, ResolvedScheduleTimeContextDto } from '../dto/sche
 const NON_MOVABLE_GROUPS = new Set<string>([
   GroupCode.GROUP_II,
   GroupCode.GROUP_II_BIFOS,
-  GroupCode.GROUP_II_SUCRA,
   GroupCode.GROUP_INSUL_ULTRA,
   GroupCode.GROUP_INSUL_RAPIDA,
   GroupCode.GROUP_INSUL_INTER,
   GroupCode.GROUP_INSUL_LONGA,
 ]);
+
+type ConflictAnchors = Partial<Record<ClinicalAnchor, number>>;
+
+export interface ConflictResolutionOptions {
+  anchors?: ConflictAnchors;
+}
 
 interface ConflictPairSelection {
   adjustedEntry: ConflictEntryLike;
@@ -52,13 +58,14 @@ export interface ConflictEntryLike {
   resolutionReasonCode?: ConflictReasonCode;
   resolutionReasonText?: string;
   shiftCount?: number;
+  resolvedSucralfateBlockerKeys?: string[];
 }
 
 @Injectable()
 export class ConflictResolutionService {
   private maxPassesMultiplier = 8;
 
-  apply(entries: ConflictEntryLike[]): void {
+  apply(entries: ConflictEntryLike[], options: ConflictResolutionOptions = {}): void {
     const maxPasses = Math.max(entries.length * this.maxPassesMultiplier, 8);
 
     for (let pass = 0; pass < maxPasses; pass += 1) {
@@ -67,7 +74,7 @@ export class ConflictResolutionService {
         return;
       }
 
-      const changed = this.applyImpact(impacts[0]);
+      const changed = this.applyImpact(impacts[0], options);
       if (!changed) {
         return;
       }
@@ -92,7 +99,11 @@ export class ConflictResolutionService {
     entries: ConflictEntryLike[],
   ): RuleImpact[] {
     return entries
-      .filter((targetEntry) => targetEntry !== sourceEntry)
+      .filter(
+        (targetEntry) =>
+          targetEntry !== sourceEntry &&
+          !this.shouldSkipResolvedSucralfateBlocker(sourceEntry, targetEntry),
+      )
       .flatMap((targetEntry) =>
         targetEntry.interactionRulesSnapshot
           .filter((rule) => this.isSupportedResolution(rule))
@@ -203,7 +214,7 @@ export class ConflictResolutionService {
     };
   }
 
-  private applyImpact(impact: RuleImpact): boolean {
+  private applyImpact(impact: RuleImpact, options: ConflictResolutionOptions): boolean {
     const entry = impact.adjustedEntry;
     entry.conflict = this.buildConflict(impact);
 
@@ -232,6 +243,11 @@ export class ConflictResolutionService {
       return true;
     }
 
+    if ((entry.shiftCount ?? 0) > 0 && this.isShiftedSucralfateDose(entry, impact)) {
+      this.applyInactiveResolution(entry, this.asMandatoryInactivationImpact(impact));
+      return true;
+    }
+
     if ((entry.shiftCount ?? 0) > 0) {
       this.applyManualResolution(
         entry,
@@ -242,14 +258,40 @@ export class ConflictResolutionService {
       return true;
     }
 
-    const shiftWindow = this.resolveShiftWindow(impact.rule);
-    entry.timeInMinutes += shiftWindow;
+    const shift = this.resolveShift(entry, impact, options);
+    entry.timeInMinutes = shift.timeInMinutes;
     entry.shiftCount = (entry.shiftCount ?? 0) + 1;
+    if (this.isMorningSucralfateShift(entry, impact)) {
+      entry.resolvedSucralfateBlockerKeys = [
+        ...(entry.resolvedSucralfateBlockerKeys ?? []),
+        impact.blockerEntry.stableKey,
+      ];
+    }
     entry.timeContext.resolvedTimeInMinutes = entry.timeInMinutes;
     entry.resolutionReasonCode = ConflictReasonCode.SHIFTED_BY_WINDOW_CONFLICT;
-    entry.resolutionReasonText = `Dose deslocada ${shiftWindow} minuto(s) por conflito clínico com ${impact.blockerEntry.medicationName}.`;
+    entry.resolutionReasonText = shift.reasonText;
     entry.note = entry.resolutionReasonText;
     return true;
+  }
+
+  private resolveShift(
+    entry: ConflictEntryLike,
+    impact: RuleImpact,
+    options: ConflictResolutionOptions,
+  ): { timeInMinutes: number; reasonText: string } {
+    const lunchAnchor = options.anchors?.[ClinicalAnchor.ALMOCO];
+    if (this.isMorningSucralfateShift(entry, impact) && lunchAnchor !== undefined) {
+      return {
+        timeInMinutes: lunchAnchor + 120,
+        reasonText: `Dose deslocada para ALMOÇO + 2H por conflito clínico com ${impact.blockerEntry.medicationName}.`,
+      };
+    }
+
+    const shiftWindow = this.resolveShiftWindow(impact.rule);
+    return {
+      timeInMinutes: entry.timeInMinutes + shiftWindow,
+      reasonText: `Dose deslocada ${shiftWindow} minuto(s) por conflito clínico com ${impact.blockerEntry.medicationName}.`,
+    };
   }
 
   private applyIterationLimit(entries: ConflictEntryLike[]): void {
@@ -275,6 +317,7 @@ export class ConflictResolutionService {
 
   private applyInactiveResolution(entry: ConflictEntryLike, impact: RuleImpact): void {
     entry.status = ScheduleStatus.INACTIVE;
+    entry.conflict = this.buildConflict(impact);
     entry.resolutionReasonCode = ConflictReasonCode.INACTIVATED_BY_MANDATORY_RULE;
     entry.resolutionReasonText = `Dose inativada por regra clínica obrigatória associada a ${impact.blockerEntry.medicationName}.`;
     entry.note = entry.resolutionReasonText;
@@ -411,6 +454,42 @@ export class ConflictResolutionService {
       rule?.windowBeforeMinutes ??
       60
     );
+  }
+
+  private isMorningSucralfateShift(entry: ConflictEntryLike, impact: RuleImpact): boolean {
+    return (
+      entry.groupCode === GroupCode.GROUP_II_SUCRA &&
+      entry.phaseDoseLabel === 'D1' &&
+      impact.rule?.interactionType === ClinicalInteractionType.AFFECTED_BY_SUCRALFATE &&
+      impact.resolutionType === ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW
+    );
+  }
+
+  private isShiftedSucralfateDose(entry: ConflictEntryLike, impact: RuleImpact): boolean {
+    return (
+      entry.groupCode === GroupCode.GROUP_II_SUCRA &&
+      entry.phaseDoseLabel === 'D1' &&
+      impact.rule?.interactionType === ClinicalInteractionType.AFFECTED_BY_SUCRALFATE
+    );
+  }
+
+  private shouldSkipResolvedSucralfateBlocker(
+    sourceEntry: ConflictEntryLike,
+    targetEntry: ConflictEntryLike,
+  ): boolean {
+    return (
+      sourceEntry.groupCode === GroupCode.GROUP_II_SUCRA &&
+      sourceEntry.phaseDoseLabel === 'D1' &&
+      !!sourceEntry.resolvedSucralfateBlockerKeys?.includes(targetEntry.stableKey)
+    );
+  }
+
+  private asMandatoryInactivationImpact(impact: RuleImpact): RuleImpact {
+    return {
+      ...impact,
+      resolutionType: ClinicalResolutionType.INACTIVATE_SOURCE,
+      matchKind: ConflictMatchKind.MANDATORY_INACTIVATION,
+    };
   }
 
   private resolveMatchKind(
