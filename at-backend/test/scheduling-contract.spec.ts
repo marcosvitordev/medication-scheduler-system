@@ -2,6 +2,8 @@ import { ClinicalAnchor } from "../src/common/enums/clinical-anchor.enum";
 import { ClinicalInteractionType } from "../src/common/enums/clinical-interaction-type.enum";
 import { ClinicalResolutionType } from "../src/common/enums/clinical-resolution-type.enum";
 import { ClinicalSemanticTag } from "../src/common/enums/clinical-semantic-tag.enum";
+import { ConflictMatchKind } from "../src/common/enums/conflict-match-kind.enum";
+import { ConflictReasonCode } from "../src/common/enums/conflict-reason-code.enum";
 import { DoseUnit } from "../src/common/enums/dose-unit.enum";
 import { GroupCode } from "../src/common/enums/group-code.enum";
 import { MonthlySpecialReference } from "../src/common/enums/monthly-special-reference.enum";
@@ -404,45 +406,73 @@ describe("SchedulingService final calendar JSON contract", () => {
         almoco: "12:00",
         lanche: "15:00",
         jantar: "19:00",
-        dormir: "22:00",
+        dormir: "21:00",
       }),
     });
 
     const result = await buildScheduleResult(service, [
       buildPrescriptionMedication({
-        medicationSnapshot: { commercialName: "SUCRAFILM" },
-        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_II_SUCRA),
+        medicationSnapshot: { commercialName: "CALCIO" },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_III_CALC),
         phases: [buildPhase({ frequency: 2 })],
       }),
       buildPrescriptionMedication({
-        medicationSnapshot: { commercialName: "CLONAZEPAM" },
-        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I_SED),
+        medicationSnapshot: { commercialName: "MEDICAMENTO 21" },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
         interactionRulesSnapshot: [
           buildInteractionRule({
-            interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
-            resolutionType: ClinicalResolutionType.INACTIVATE_SOURCE,
-            targetGroupCode: GroupCode.GROUP_II_SUCRA,
-            targetProtocolCode: undefined,
-            applicableSemanticTags: [ClinicalSemanticTag.BEDTIME_EQUIVALENT],
+            interactionType: ClinicalInteractionType.AFFECTED_BY_CALCIUM,
+            resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
+            targetGroupCode: GroupCode.GROUP_III_CALC,
           }),
         ],
-        phases: [buildPhase()],
+        phases: [
+          buildPhase({
+            frequency: 1,
+            manualAdjustmentEnabled: true,
+            manualTimes: ["21:00"],
+            treatmentDays: 10,
+          }),
+        ],
+      }),
+      buildPrescriptionMedication({
+        medicationSnapshot: { commercialName: "MEDICAMENTO 22" },
+        protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
+        interactionRulesSnapshot: [
+          buildInteractionRule({
+            interactionType: ClinicalInteractionType.AFFECTED_BY_CALCIUM,
+            resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
+            targetGroupCode: GroupCode.GROUP_III_CALC,
+            targetProtocolCode: undefined,
+          }),
+        ],
+        phases: [
+          buildPhase({
+            frequency: 1,
+            manualAdjustmentEnabled: true,
+            manualTimes: ["22:00"],
+            treatmentDays: 10,
+          }),
+        ],
       }),
     ]);
 
-    const sucralfateAtNight = result.scheduleItems
+    const calciumAtNight = result.scheduleItems
       .flatMap((item) => item.doses)
       .find((dose) => dose.horario === "22:00");
 
-    expect(sucralfateAtNight).toMatchObject({
+    expect(calciumAtNight).toMatchObject({
+      reasonCode: ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      reasonText: expect.stringContaining("revalidação"),
       contextoHorario: {
         ancora: ClinicalAnchor.DORMIR,
-        horario_original: "22:00",
+        horario_original: "21:00",
         horario_resolvido: "22:00",
       },
       conflito: {
-        tipo_interacao_codigo: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
-        tipo_resolucao_codigo: ClinicalResolutionType.INACTIVATE_SOURCE,
+        tipo_interacao_codigo: ClinicalInteractionType.AFFECTED_BY_CALCIUM,
+        tipo_resolucao_codigo: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
+        tipo_match_codigo: ConflictMatchKind.EXACT_MINUTE,
       },
     });
   });

@@ -1,3 +1,4 @@
+import { ConflictReasonCode } from '../../../common/enums/conflict-reason-code.enum';
 import { ScheduleStatus } from "../../../common/enums/schedule-status.enum";
 import {
   ConflitoAgendamentoDto,
@@ -41,6 +42,8 @@ export interface CalendarScheduleDoseDto {
   status: ScheduleStatus;
   statusLabel: string;
   observacao: string | null;
+  reasonCode: ConflictReasonCode | null;
+  reasonText: string | null;
   contextoHorario: ContextoHorarioAgendadoDto;
   conflito: ConflitoAgendamentoDto | null;
 }

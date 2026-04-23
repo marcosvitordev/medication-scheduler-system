@@ -3,6 +3,8 @@ import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../../common/enums/clinical-resolution-type.enum';
 import { ClinicalSemanticTag } from '../../../common/enums/clinical-semantic-tag.enum';
+import { ConflictMatchKind } from '../../../common/enums/conflict-match-kind.enum';
+import { ConflictReasonCode } from '../../../common/enums/conflict-reason-code.enum';
 import { PrnReason } from '../../../common/enums/prn-reason.enum';
 import { TreatmentRecurrence } from '../../../common/enums/treatment-recurrence.enum';
 import { PatientPrescriptionMedication } from '../../patient-prescriptions/entities/patient-prescription-medication.entity';
@@ -107,6 +109,9 @@ export class ScheduledDose {
   @Column({ type: 'varchar', length: 50, nullable: true })
   conflictResolutionType?: ClinicalResolutionType;
 
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  conflictMatchKind?: ConflictMatchKind;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   conflictTriggerMedicationName?: string;
 
@@ -124,4 +129,10 @@ export class ScheduledDose {
 
   @Column({ type: 'int', nullable: true })
   conflictWindowAfterMinutes?: number;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  resolutionReasonCode?: ConflictReasonCode;
+
+  @Column({ type: 'text', nullable: true })
+  resolutionReasonText?: string;
 }

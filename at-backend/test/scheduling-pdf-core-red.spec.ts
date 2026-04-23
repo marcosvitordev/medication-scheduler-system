@@ -1,5 +1,7 @@
 import { ClinicalInteractionType } from '../src/common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../src/common/enums/clinical-resolution-type.enum';
+import { ConflictMatchKind } from '../src/common/enums/conflict-match-kind.enum';
+import { ConflictReasonCode } from '../src/common/enums/conflict-reason-code.enum';
 import { DoseUnit } from '../src/common/enums/dose-unit.enum';
 import { GroupCode } from '../src/common/enums/group-code.enum';
 import { ScheduleStatus } from '../src/common/enums/schedule-status.enum';
@@ -196,7 +198,7 @@ describe('SchedulingService PDF core rules', () => {
       });
     });
 
-    it('moves SUCRAFILM D1 to 15:00 when an explicit sucralfate rule conflicts at 08:00', async () => {
+    it('keeps SUCRAFILM fixed and marks LOSARTANA as manual when the shifted slot still falls inside another sucralfate window', async () => {
       const { service } = createSchedulingService({ routine });
 
       const morningInteractor = buildPrescriptionMedication({
@@ -233,26 +235,29 @@ describe('SchedulingService PDF core rules', () => {
         morningInteractor,
       ]);
 
-      const movedEntry = findEntryByTime(result, 'SUCRAFILM', '15:00');
-      expectEntry(movedEntry, {
-        administrationLabel: '10 ML',
-      });
+      const movedEntry = findEntryByTime(result, 'LOSARTANA', '15:00');
+      expect(movedEntry?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      expect(movedEntry?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      );
       expect(movedEntry?.timeContext.originalTimeFormatted).toBe('08:00');
       expect(movedEntry?.timeContext.resolvedTimeFormatted).toBe('15:00');
       expect(movedEntry?.conflict).toMatchObject({
         interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
         resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
-        triggerMedicationName: 'LOSARTANA',
+        triggerMedicationName: 'SUCRAFILM',
         windowAfterMinutes: 420,
       });
-      expect(findEntryByTime(result, 'SUCRAFILM', '08:00')).toBeUndefined();
-      expect(findEntriesByMedicationAndTime(result, 'SUCRAFILM', '15:00')).toHaveLength(1);
+      expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
+        administrationLabel: '10 ML',
+      });
+      expect(findEntriesByMedicationAndTime(result, 'LOSARTANA', '15:00')).toHaveLength(1);
       expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
     });
 
-    it('treats GROUP_I_SED at 20:40 as clinically equivalent to bedtime and inactivates SUCRAFILM at 21:00', async () => {
+    it('treats GROUP_I_SED at 20:40 as clinically equivalent to bedtime and inactivates CLONAZEPAM instead of SUCRAFILM', async () => {
       const { service } = createSchedulingService({ routine });
 
       const clonazepam = buildPrescriptionMedication({
@@ -279,15 +284,15 @@ describe('SchedulingService PDF core rules', () => {
         clonazepam,
       ]);
 
-      expectInactiveEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
-        administrationLabel: '10 ML',
-      });
-      expectEntry(findEntryByTime(result, 'CLONAZEPAM', '20:40'), {
+      expectInactiveEntry(findEntryByTime(result, 'CLONAZEPAM', '20:40'), {
         administrationLabel: '1 COMP',
+      });
+      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+        administrationLabel: '10 ML',
       });
     });
 
-    it('inactivates SUCRAFILM D1 when rule-driven conflicts exist at 08:00 and again at 15:00', async () => {
+    it('keeps SUCRAFILM fixed and manualizes the shifted morning blocker when the afternoon window remains clinically conflicting', async () => {
       const { service } = createSchedulingService({ routine });
 
       const morningBlock = buildPrescriptionMedication({
@@ -351,22 +356,25 @@ describe('SchedulingService PDF core rules', () => {
         afternoonBlock,
       ]);
 
-      const inactiveMorning = findEntryByTime(result, 'SUCRAFILM', '15:00');
-      expectInactiveEntry(inactiveMorning, {
+      const shiftedMorning = findEntryByTime(result, 'LOSARTANA MANHA', '15:00');
+      expect(shiftedMorning?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      expect(shiftedMorning?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      );
+      expect(shiftedMorning?.timeContext.originalTimeFormatted).toBe('08:00');
+      expect(shiftedMorning?.timeContext.resolvedTimeFormatted).toBe('15:00');
+      expect(shiftedMorning?.conflict).toMatchObject({
+        interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
+        resolutionType: ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW,
+        triggerMedicationName: 'SUCRAFILM',
+      });
+      expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
         administrationLabel: '10 ML',
       });
-      expect(inactiveMorning?.timeContext.originalTimeFormatted).toBe('08:00');
-      expect(inactiveMorning?.timeContext.resolvedTimeFormatted).toBe('15:00');
-      expect(inactiveMorning?.conflict).toMatchObject({
-        interactionType: ClinicalInteractionType.AFFECTED_BY_SUCRALFATE,
-        resolutionType: ClinicalResolutionType.INACTIVATE_SOURCE,
-        triggerMedicationName: 'LOSARTANA TARDE',
-      });
-      expect(findEntryByTime(result, 'SUCRAFILM', '08:00')).toBeUndefined();
       expect(findEntriesByMedication(result, 'SUCRAFILM')).toHaveLength(2);
     });
 
-    it('inactivates only the bedtime SUCRAFILM dose when the conflict exists only at 21:00', async () => {
+    it('keeps SUCRAFILM fixed and inactivates only the bedtime blocker when the conflict exists at 21:00', async () => {
       const { service } = createSchedulingService({ routine });
 
       const bedtimeConflict = buildPrescriptionMedication({
@@ -410,10 +418,12 @@ describe('SchedulingService PDF core rules', () => {
       expectEntry(findEntryByTime(result, 'SUCRAFILM', '08:00'), {
         administrationLabel: '10 ML',
       });
-      expectInactiveEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
-      expect(findEntryByTime(result, 'SUCRAFILM', '15:00')).toBeUndefined();
+      expectInactiveEntry(findEntryByTime(result, 'ZOLPIDEM', '21:00'), {
+        administrationLabel: '1 COMP',
+      });
     });
 
     it('uses only ACORDAR + 2h when SUCRAFILM frequency is 1', async () => {
@@ -586,7 +596,35 @@ describe('SchedulingService PDF core rules', () => {
       expect(calciumEntry?.note).toContain('ajuste manual');
     });
 
-    it('uses rule windowMinutes to shift calcium by 120 minutes when configured', async () => {
+    it('revalidates the shifted calcium dose against a clinical window even when no second exact-minute collision exists', async () => {
+      const { service } = createSchedulingService({ routine });
+      const result = await buildScheduleResult(service, [
+        buildCalciumMedication(),
+        buildCalciumSensitiveMedication('BLOQUEADOR 21', '21:00'),
+        buildCalciumSensitiveMedication(
+          'BLOQUEADOR 22H30',
+          '22:30',
+          'Conflito por janela clínica após deslocamento.',
+          {
+            windowMinutes: 60,
+          },
+        ),
+      ]);
+
+      const calciumEntry = findEntryByTime(result, 'CALCIO', '22:00');
+      expect(calciumEntry).toBeDefined();
+      expect(calciumEntry?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      expect(calciumEntry?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      );
+      expect(calciumEntry?.conflict).toMatchObject({
+        matchKind: ConflictMatchKind.CLINICAL_WINDOW,
+        triggerMedicationName: 'BLOQUEADOR 22H30',
+      });
+      expect(findEntryByTime(result, 'CALCIO', '22:30')).toBeUndefined();
+    });
+
+    it('marks calcium as manual when a 120-minute shift still lands on the conflict window boundary', async () => {
       const { service } = createSchedulingService({ routine });
       const result = await buildScheduleResult(service, [
         buildCalciumMedication(),
@@ -595,11 +633,11 @@ describe('SchedulingService PDF core rules', () => {
         }),
       ]);
 
-      expectEntry(findEntryByTime(result, 'CALCIO', '23:00'), {
-        administrationLabel: '1 COMP',
-      });
-      expect(findEntryByTime(result, 'CALCIO', '22:00')).toBeUndefined();
-      expect(findEntryByTime(result, 'CALCIO', '21:00')).toBeUndefined();
+      const calciumEntry = findEntryByTime(result, 'CALCIO', '23:00');
+      expect(calciumEntry?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      expect(calciumEntry?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+      );
     });
 
     it('prefers REQUIRE_MANUAL_ADJUSTMENT over SHIFT_SOURCE_BY_WINDOW when both rules match and manual has higher priority', async () => {
@@ -682,6 +720,157 @@ describe('SchedulingService PDF core rules', () => {
     });
   });
 
+  describe('prioridade clínica não deslocável', () => {
+    const routine = buildRoutine({
+      acordar: '06:00',
+      cafe: '07:00',
+      almoco: '13:00',
+      lanche: '16:00',
+      jantar: '19:00',
+      dormir: '21:00',
+    });
+
+    function buildProtectedMedication(name: string, groupCode: GroupCode, time = '07:00') {
+      return buildPrescriptionMedication({
+        medicationSnapshot: {
+          commercialName: name,
+          activePrinciple: name,
+          presentation: 'Comprimido',
+          administrationRoute: 'VO',
+          usageInstructions: 'Horário clínico prioritário.',
+        },
+        protocolSnapshot: buildProtocolSnapshot(groupCode),
+        phases: [
+          buildPhase({
+            frequency: 1,
+            doseAmount: '1 COMP',
+            manualAdjustmentEnabled: true,
+            manualTimes: [time],
+            treatmentDays: 10,
+          }),
+        ],
+      });
+    }
+
+    it('keeps GROUP_II fixed and marks the movable medication for manual adjustment on exact collision', async () => {
+      const { service } = createSchedulingService({ routine });
+      const result = await buildScheduleResult(service, [
+        buildProtectedMedication('ALENDRONATO', GroupCode.GROUP_II_BIFOS),
+        buildPrescriptionMedication({
+          medicationSnapshot: {
+            commercialName: 'LOSARTANA',
+            activePrinciple: 'Losartana',
+            presentation: 'Comprimido',
+            administrationRoute: 'VO',
+            usageInstructions: 'Conforme prescrição.',
+          },
+          protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
+          phases: [
+            buildPhase({
+              frequency: 1,
+              manualAdjustmentEnabled: true,
+              manualTimes: ['07:00'],
+              treatmentDays: 10,
+            }),
+          ],
+        }),
+      ]);
+
+      expect(findEntryByTime(result, 'ALENDRONATO', '07:00')?.status).toBe(
+        ScheduleStatus.ACTIVE,
+      );
+      const losartana = findEntryByTime(result, 'LOSARTANA', '07:00');
+      expect(losartana?.status).toBe(ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED);
+      expect(losartana?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_NON_MOVABLE_COLLISION,
+      );
+      expect(losartana?.conflict).toMatchObject({
+        matchKind: ConflictMatchKind.PRIORITY_BLOCK,
+        triggerMedicationName: 'ALENDRONATO',
+      });
+    });
+
+    it('keeps insulin fixed and marks the movable medication for manual adjustment on exact collision', async () => {
+      const { service } = createSchedulingService({ routine });
+      const result = await buildScheduleResult(service, [
+        buildProtectedMedication('INSULINA RÁPIDA', GroupCode.GROUP_INSUL_RAPIDA),
+        buildPrescriptionMedication({
+          medicationSnapshot: {
+            commercialName: 'OMEPRAZOL',
+            activePrinciple: 'Omeprazol',
+            presentation: 'Cápsula',
+            administrationRoute: 'VO',
+            usageInstructions: 'Conforme prescrição.',
+          },
+          protocolSnapshot: buildProtocolSnapshot(GroupCode.GROUP_I),
+          phases: [
+            buildPhase({
+              frequency: 1,
+              manualAdjustmentEnabled: true,
+              manualTimes: ['07:00'],
+              treatmentDays: 10,
+            }),
+          ],
+        }),
+      ]);
+
+      expect(findEntryByTime(result, 'INSULINA RÁPIDA', '07:00')?.status).toBe(
+        ScheduleStatus.ACTIVE,
+      );
+      expect(findEntryByTime(result, 'OMEPRAZOL', '07:00')?.status).toBe(
+        ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED,
+      );
+    });
+
+    it('marks one protected dose as manual when insulin and GROUP_II collide', async () => {
+      const { service } = createSchedulingService({ routine });
+      const result = await buildScheduleResult(service, [
+        buildProtectedMedication('BIFOS PRIORITARIO', GroupCode.GROUP_II_BIFOS),
+        buildProtectedMedication('INSULINA BASAL', GroupCode.GROUP_INSUL_LONGA),
+      ]);
+
+      const statuses = [
+        findEntryByTime(result, 'BIFOS PRIORITARIO', '07:00')?.status,
+        findEntryByTime(result, 'INSULINA BASAL', '07:00')?.status,
+      ];
+      expect(statuses.filter((status) => status === ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED)).toHaveLength(1);
+      expect(statuses.filter((status) => status === ScheduleStatus.ACTIVE)).toHaveLength(1);
+
+      const manualEntry =
+        findEntryByTime(result, 'BIFOS PRIORITARIO', '07:00')?.status ===
+        ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED
+          ? findEntryByTime(result, 'BIFOS PRIORITARIO', '07:00')
+          : findEntryByTime(result, 'INSULINA BASAL', '07:00');
+
+      expect(manualEntry?.reasonCode).toBe(
+        ConflictReasonCode.MANUAL_REQUIRED_NON_MOVABLE_COLLISION,
+      );
+      expect(manualEntry?.conflict?.matchKind).toBe(ConflictMatchKind.PRIORITY_BLOCK);
+    });
+
+    it('marks one insulin dose as manual when two protected insulin doses collide', async () => {
+      const { service } = createSchedulingService({ routine });
+      const result = await buildScheduleResult(service, [
+        buildProtectedMedication('INSULINA A', GroupCode.GROUP_INSUL_RAPIDA),
+        buildProtectedMedication('INSULINA B', GroupCode.GROUP_INSUL_LONGA),
+      ]);
+
+      const insulinA = findEntryByTime(result, 'INSULINA A', '07:00');
+      const insulinB = findEntryByTime(result, 'INSULINA B', '07:00');
+
+      expect(
+        [insulinA?.status, insulinB?.status].filter(
+          (status) => status === ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED,
+        ),
+      ).toHaveLength(1);
+      expect(
+        [insulinA?.status, insulinB?.status].filter(
+          (status) => status === ScheduleStatus.ACTIVE,
+        ),
+      ).toHaveLength(1);
+    });
+  });
+
   describe('sucralfato com janela configuravel', () => {
     const routine = buildRoutine({
       acordar: '06:00',
@@ -692,7 +881,7 @@ describe('SchedulingService PDF core rules', () => {
       dormir: '21:00',
     });
 
-    it('inactivates SUCRAFILM at 21:00 when bedtime-equivalent conflict is 29 minutes away and rule window is 30', async () => {
+    it('keeps SUCRAFILM fixed and inactivates the bedtime-equivalent blocker when the rule window is 30', async () => {
       const { service } = createSchedulingService({ routine });
 
       const sucralfato = buildPrescriptionMedication({
@@ -752,10 +941,10 @@ describe('SchedulingService PDF core rules', () => {
 
       const result = await buildScheduleResult(service, [sucralfato, sedativo]);
 
-      expectInactiveEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
+      expectEntry(findEntryByTime(result, 'SUCRAFILM', '21:00'), {
         administrationLabel: '10 ML',
       });
-      expectEntry(findEntryByTime(result, 'SEDATIVO TESTE', '20:31'), {
+      expectInactiveEntry(findEntryByTime(result, 'SEDATIVO TESTE', '20:31'), {
         administrationLabel: '1 COMP',
       });
     });

@@ -432,6 +432,8 @@ function toLegacyConflict(
     interactionLabel: conflito.tipo_interacao_label ?? undefined,
     resolutionType: conflito.tipo_resolucao_codigo ?? undefined,
     resolutionLabel: conflito.tipo_resolucao_label ?? undefined,
+    matchKind: conflito.tipo_match_codigo ?? undefined,
+    matchKindLabel: conflito.tipo_match_label ?? undefined,
     triggerMedicationName: conflito.medicamento_disparador_nome ?? undefined,
     triggerGroupCode: conflito.grupo_disparador_codigo ?? undefined,
     triggerProtocolCode: conflito.protocolo_disparador_codigo ?? undefined,
@@ -588,6 +590,8 @@ function toLegacyEntry(
     status: entry.status,
     statusLabel: entry.statusLabel,
     note: entry.observacao ?? undefined,
+    reasonCode: entry.reasonCode ?? undefined,
+    reasonText: entry.reasonText ?? undefined,
     clinicalInstructionLabel: parseLegacyClinicalInstructionLabel(
       item.recorrenciaTexto,
     ),

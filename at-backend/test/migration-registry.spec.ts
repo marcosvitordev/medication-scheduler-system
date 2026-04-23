@@ -13,6 +13,7 @@ describe('Migration registry', () => {
       '1763406000000-BaselineClinicalCatalogAndPatientPrescriptions.ts',
       '1763488800000-ConvertClinicalTimeColumnsToVarchar.ts',
       '1763571600000-NormalizePrescriptionPhaseDoseOverrides.ts',
+      '1763662800000-HardenConflictAuditColumnsInScheduledDoses.ts',
     ]);
   });
 });

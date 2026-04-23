@@ -10,6 +10,8 @@ import { ClinicalAnchor } from "../../common/enums/clinical-anchor.enum";
 import { ClinicalInteractionType } from "../../common/enums/clinical-interaction-type.enum";
 import { ClinicalResolutionType } from "../../common/enums/clinical-resolution-type.enum";
 import { ClinicalSemanticTag } from "../../common/enums/clinical-semantic-tag.enum";
+import { ConflictMatchKind } from "../../common/enums/conflict-match-kind.enum";
+import { ConflictReasonCode } from "../../common/enums/conflict-reason-code.enum";
 import { OcularLaterality } from "../../common/enums/ocular-laterality.enum";
 import { OticLaterality } from "../../common/enums/otic-laterality.enum";
 import { PrnReason } from "../../common/enums/prn-reason.enum";
@@ -73,6 +75,7 @@ interface MonthlySpecialRule {
 interface WorkingEntry extends ConflictEntryLike {
   prescriptionMedication: PatientPrescriptionMedication;
   phase: PatientPrescriptionPhase;
+  stableKey: string;
   sourceClinicalMedicationId: string;
   sourceProtocolId: string;
   phaseOrder: number;
@@ -99,6 +102,9 @@ interface WorkingEntry extends ConflictEntryLike {
   prnReason?: PrnReason;
   clinicalInstructionLabel?: string;
   timeFormatted: string;
+  resolutionReasonCode?: ConflictReasonCode;
+  resolutionReasonText?: string;
+  shiftCount?: number;
 }
 
 @Injectable()
@@ -130,11 +136,11 @@ export class SchedulingService {
     entries = this.applyConflictRules(entries);
     entries = entries.map((entry) => ({
       ...entry,
-      timeFormatted: minutesToHhmm(entry.timeInMinutes),
+      timeFormatted: formatMinuteIndex(entry.timeInMinutes),
       timeContext: {
         ...entry.timeContext,
         resolvedTimeInMinutes: entry.timeInMinutes,
-        resolvedTimeFormatted: minutesToHhmm(entry.timeInMinutes),
+        resolvedTimeFormatted: formatMinuteIndex(entry.timeInMinutes),
       },
     }));
     entries = this.sortEntries(entries);
@@ -370,6 +376,7 @@ export class SchedulingService {
     return {
       prescriptionMedication: medication,
       phase,
+      stableKey: `${medication.id}:${phase.id}:${doseLabel}`,
       sourceClinicalMedicationId: medication.sourceClinicalMedicationId,
       sourceProtocolId: medication.sourceProtocolId,
       phaseOrder: phase.phaseOrder,
@@ -428,6 +435,7 @@ export class SchedulingService {
       },
       status: ScheduleStatus.ACTIVE,
       note,
+      shiftCount: 0,
     };
   }
 
@@ -520,12 +528,15 @@ export class SchedulingService {
           note: entry.note,
           conflictInteractionType: entry.conflict?.interactionType,
           conflictResolutionType: entry.conflict?.resolutionType,
+          conflictMatchKind: entry.conflict?.matchKind,
           conflictTriggerMedicationName: entry.conflict?.triggerMedicationName,
           conflictTriggerGroupCode: entry.conflict?.triggerGroupCode,
           conflictTriggerProtocolCode: entry.conflict?.triggerProtocolCode,
           conflictRulePriority: entry.conflict?.rulePriority,
           conflictWindowBeforeMinutes: entry.conflict?.windowBeforeMinutes,
           conflictWindowAfterMinutes: entry.conflict?.windowAfterMinutes,
+          resolutionReasonCode: entry.resolutionReasonCode,
+          resolutionReasonText: entry.resolutionReasonText,
         }),
       ),
     );
@@ -663,6 +674,8 @@ export class SchedulingService {
       status: dose.status as ScheduleStatus,
       statusLabel: toStatusLabel(dose.status),
       observacao: dose.note ?? null,
+      reasonCode: dose.resolutionReasonCode ?? null,
+      reasonText: dose.resolutionReasonText ?? null,
       contextoHorario: this.mapTimeContext(dose),
       conflito: this.mapConflito(dose),
     };
@@ -707,6 +720,8 @@ export class SchedulingService {
       tipo_interacao_label: toInteractionLabel(dose.conflictInteractionType),
       tipo_resolucao_codigo: dose.conflictResolutionType ?? null,
       tipo_resolucao_label: toResolutionLabel(dose.conflictResolutionType),
+      tipo_match_codigo: dose.conflictMatchKind ?? null,
+      tipo_match_label: toConflictMatchLabel(dose.conflictMatchKind),
       medicamento_disparador_nome: dose.conflictTriggerMedicationName ?? null,
       grupo_disparador_codigo: dose.conflictTriggerGroupCode ?? null,
       protocolo_disparador_codigo: dose.conflictTriggerProtocolCode ?? null,
@@ -947,6 +962,21 @@ function toResolutionLabel(
       return "Deslocar dose por janela";
     case ClinicalResolutionType.REQUIRE_MANUAL_ADJUSTMENT:
       return "Exigir ajuste manual";
+    default:
+      return null;
+  }
+}
+
+function toConflictMatchLabel(matchKind?: ConflictMatchKind): string | null {
+  switch (matchKind) {
+    case ConflictMatchKind.EXACT_MINUTE:
+      return "Mesmo minuto";
+    case ConflictMatchKind.CLINICAL_WINDOW:
+      return "Janela clínica";
+    case ConflictMatchKind.PRIORITY_BLOCK:
+      return "Bloqueio por prioridade clínica";
+    case ConflictMatchKind.MANDATORY_INACTIVATION:
+      return "Inativação obrigatória";
     default:
       return null;
   }

@@ -1,12 +1,42 @@
 import { Injectable } from '@nestjs/common';
+import { GroupCode } from '../../../common/enums/group-code.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../../common/enums/clinical-resolution-type.enum';
 import { ClinicalSemanticTag } from '../../../common/enums/clinical-semantic-tag.enum';
+import { ConflictMatchKind } from '../../../common/enums/conflict-match-kind.enum';
+import { ConflictReasonCode } from '../../../common/enums/conflict-reason-code.enum';
 import { ScheduleStatus } from '../../../common/enums/schedule-status.enum';
 import { ClinicalInteractionRuleSnapshot } from '../../patient-prescriptions/entities/patient-prescription-snapshot.types';
 import { ScheduleConflictDto, ResolvedScheduleTimeContextDto } from '../dto/schedule-response.dto';
 
+const NON_MOVABLE_GROUPS = new Set<string>([
+  GroupCode.GROUP_II,
+  GroupCode.GROUP_II_BIFOS,
+  GroupCode.GROUP_II_SUCRA,
+  GroupCode.GROUP_INSUL_ULTRA,
+  GroupCode.GROUP_INSUL_RAPIDA,
+  GroupCode.GROUP_INSUL_INTER,
+  GroupCode.GROUP_INSUL_LONGA,
+]);
+
+interface ConflictPairSelection {
+  adjustedEntry: ConflictEntryLike;
+  blockerEntry: ConflictEntryLike;
+  bothNonMovable: boolean;
+}
+
+interface RuleImpact {
+  adjustedEntry: ConflictEntryLike;
+  blockerEntry: ConflictEntryLike;
+  ruleOwnerEntry?: ConflictEntryLike;
+  rule?: ClinicalInteractionRuleSnapshot;
+  resolutionType: ClinicalResolutionType;
+  matchKind: ConflictMatchKind;
+  rulePriority: number;
+}
+
 export interface ConflictEntryLike {
+  stableKey: string;
   medicationName: string;
   groupCode: string;
   protocolCode: string;
@@ -19,44 +49,45 @@ export interface ConflictEntryLike {
   phaseDoseLabel: string;
   timeContext: ResolvedScheduleTimeContextDto;
   conflict?: ScheduleConflictDto;
-}
-
-interface RuleImpact {
-  sourceEntry: ConflictEntryLike;
-  targetEntry: ConflictEntryLike;
-  rule: ClinicalInteractionRuleSnapshot;
-  sortPriority: number;
+  resolutionReasonCode?: ConflictReasonCode;
+  resolutionReasonText?: string;
+  shiftCount?: number;
 }
 
 @Injectable()
 export class ConflictResolutionService {
+  private maxPassesMultiplier = 8;
+
   apply(entries: ConflictEntryLike[]): void {
-    this.applyInteractionRules(entries);
-  }
+    const maxPasses = Math.max(entries.length * this.maxPassesMultiplier, 8);
 
-  private applyInteractionRules(entries: ConflictEntryLike[]): void {
-    const activeEntries = entries.filter((entry) => entry.status === ScheduleStatus.ACTIVE);
-    const impacts = activeEntries
-      .flatMap((sourceEntry) => this.collectImpactsForSource(sourceEntry, activeEntries))
-      .sort((left, right) =>
-        right.sortPriority - left.sortPriority ||
-        right.targetEntry.protocolPriority - left.targetEntry.protocolPriority ||
-        left.targetEntry.medicationName.localeCompare(right.targetEntry.medicationName),
-      );
-
-    const bestImpactBySource = new Map<ConflictEntryLike, RuleImpact>();
-    impacts.forEach((impact) => {
-      if (!bestImpactBySource.has(impact.sourceEntry)) {
-        bestImpactBySource.set(impact.sourceEntry, impact);
+    for (let pass = 0; pass < maxPasses; pass += 1) {
+      const impacts = this.detectConflicts(entries);
+      if (impacts.length === 0) {
+        return;
       }
-    });
 
-    for (const [entry, impact] of bestImpactBySource.entries()) {
-      this.applyImpact(entry, impact, entries);
+      const changed = this.applyImpact(impacts[0]);
+      if (!changed) {
+        return;
+      }
     }
+
+    this.applyIterationLimit(entries);
   }
 
-  private collectImpactsForSource(
+  private detectConflicts(entries: ConflictEntryLike[]): RuleImpact[] {
+    const activeEntries = entries.filter((entry) => entry.status === ScheduleStatus.ACTIVE);
+
+    const ruleImpacts = activeEntries
+      .flatMap((sourceEntry) => this.collectRuleImpactsForSource(sourceEntry, activeEntries));
+
+    const priorityImpacts = this.collectPriorityPolicyImpacts(activeEntries);
+
+    return [...ruleImpacts, ...priorityImpacts].sort((left, right) => this.compareImpacts(left, right));
+  }
+
+  private collectRuleImpactsForSource(
     sourceEntry: ConflictEntryLike,
     entries: ConflictEntryLike[],
   ): RuleImpact[] {
@@ -66,70 +97,229 @@ export class ConflictResolutionService {
         targetEntry.interactionRulesSnapshot
           .filter((rule) => this.isSupportedResolution(rule))
           .filter((rule) => this.matchesRule(targetEntry, sourceEntry, rule))
-          .map((rule) => ({
-            sourceEntry,
-            targetEntry,
-            rule,
-            sortPriority: rule.priority ?? 0,
-          })),
-      );
+          .map((rule) => this.buildRuleImpact(sourceEntry, targetEntry, rule)),
+      )
+      .filter((impact): impact is RuleImpact => !!impact);
   }
 
-  private applyImpact(
-    entry: ConflictEntryLike,
-    impact: RuleImpact,
-    entries: ConflictEntryLike[],
-  ): void {
+  private collectPriorityPolicyImpacts(entries: ConflictEntryLike[]): RuleImpact[] {
+    const impacts: RuleImpact[] = [];
+
+    for (let index = 0; index < entries.length; index += 1) {
+      for (let targetIndex = index + 1; targetIndex < entries.length; targetIndex += 1) {
+        const left = entries[index];
+        const right = entries[targetIndex];
+
+        if (left.timeInMinutes !== right.timeInMinutes) {
+          continue;
+        }
+        if (!this.isNonMovable(left) && !this.isNonMovable(right)) {
+          continue;
+        }
+        if (this.hasMatchingRuleBetween(left, right)) {
+          continue;
+        }
+
+        const selection = this.selectAdjustedEntry(left, right);
+        impacts.push({
+          adjustedEntry: selection.adjustedEntry,
+          blockerEntry: selection.blockerEntry,
+          ruleOwnerEntry: undefined,
+          resolutionType: ClinicalResolutionType.REQUIRE_MANUAL_ADJUSTMENT,
+          matchKind: ConflictMatchKind.PRIORITY_BLOCK,
+          rulePriority: 10_000,
+        });
+      }
+    }
+
+    return impacts;
+  }
+
+  private buildRuleImpact(
+    sourceEntry: ConflictEntryLike,
+    targetEntry: ConflictEntryLike,
+    rule: ClinicalInteractionRuleSnapshot,
+  ): RuleImpact | null {
+    const selection = this.selectAdjustedEntry(sourceEntry, targetEntry);
+
+    if (selection.bothNonMovable) {
+      return {
+        adjustedEntry: selection.adjustedEntry,
+        blockerEntry: selection.blockerEntry,
+        ruleOwnerEntry: targetEntry,
+        rule,
+        resolutionType: ClinicalResolutionType.REQUIRE_MANUAL_ADJUSTMENT,
+        matchKind: ConflictMatchKind.PRIORITY_BLOCK,
+        rulePriority: rule.priority ?? 0,
+      };
+    }
+
+    return {
+      adjustedEntry: selection.adjustedEntry,
+      blockerEntry: selection.blockerEntry,
+      ruleOwnerEntry: targetEntry,
+      rule,
+      resolutionType: rule.resolutionType,
+      matchKind: this.resolveMatchKind(sourceEntry, targetEntry, rule),
+      rulePriority: rule.priority ?? 0,
+    };
+  }
+
+  private selectAdjustedEntry(
+    sourceEntry: ConflictEntryLike,
+    targetEntry: ConflictEntryLike,
+  ): ConflictPairSelection {
+    const sourceNonMovable = this.isNonMovable(sourceEntry);
+    const targetNonMovable = this.isNonMovable(targetEntry);
+
+    if (sourceNonMovable && targetNonMovable) {
+      const comparison = this.compareBlockerStrength(sourceEntry, targetEntry);
+      if (comparison <= 0) {
+        return {
+          adjustedEntry: sourceEntry,
+          blockerEntry: targetEntry,
+          bothNonMovable: true,
+        };
+      }
+      return {
+        adjustedEntry: targetEntry,
+        blockerEntry: sourceEntry,
+        bothNonMovable: true,
+      };
+    }
+
+    if (sourceNonMovable && !targetNonMovable) {
+      return {
+        adjustedEntry: targetEntry,
+        blockerEntry: sourceEntry,
+        bothNonMovable: false,
+      };
+    }
+
+    return {
+      adjustedEntry: sourceEntry,
+      blockerEntry: targetEntry,
+      bothNonMovable: false,
+    };
+  }
+
+  private applyImpact(impact: RuleImpact): boolean {
+    const entry = impact.adjustedEntry;
     entry.conflict = this.buildConflict(impact);
 
-    if (impact.rule.resolutionType !== ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW) {
-      this.applyTerminalResolution(entry, impact, false);
-      return;
+    if (impact.matchKind === ConflictMatchKind.PRIORITY_BLOCK) {
+      this.applyManualResolution(
+        entry,
+        impact,
+        ConflictReasonCode.MANUAL_REQUIRED_NON_MOVABLE_COLLISION,
+        `ajuste manual exigido por choque com dose não deslocável de ${impact.blockerEntry.medicationName}.`,
+      );
+      return true;
+    }
+
+    if (impact.resolutionType === ClinicalResolutionType.INACTIVATE_SOURCE) {
+      this.applyInactiveResolution(entry, impact);
+      return true;
+    }
+
+    if (impact.resolutionType === ClinicalResolutionType.REQUIRE_MANUAL_ADJUSTMENT) {
+      this.applyManualResolution(
+        entry,
+        impact,
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+        `ajuste manual exigido por conflito clínico com ${impact.blockerEntry.medicationName}.`,
+      );
+      return true;
+    }
+
+    if ((entry.shiftCount ?? 0) > 0) {
+      this.applyManualResolution(
+        entry,
+        impact,
+        ConflictReasonCode.MANUAL_REQUIRED_PERSISTENT_CONFLICT,
+        `ajuste manual exigido após revalidação de conflito clínico com ${impact.blockerEntry.medicationName}.`,
+      );
+      return true;
     }
 
     const shiftWindow = this.resolveShiftWindow(impact.rule);
     entry.timeInMinutes += shiftWindow;
-    entry.note = `Dose deslocada ${shiftWindow} minuto(s) por interferência com ${impact.targetEntry.medicationName}.`;
-
-    const persistentImpacts = entries
-      .filter((candidate) => candidate !== entry && candidate.status === ScheduleStatus.ACTIVE)
-      .flatMap((targetEntry) =>
-        targetEntry.interactionRulesSnapshot
-          .filter((rule) => this.isSupportedResolution(rule))
-          .filter((rule) => this.matchesRuleAtResolvedSlot(targetEntry, entry, rule))
-          .map((rule) => ({
-            sourceEntry: entry,
-            targetEntry,
-            rule,
-            sortPriority: rule.priority ?? 0,
-          })),
-      )
-      .sort((left, right) => right.sortPriority - left.sortPriority);
-
-    if (persistentImpacts.length > 0) {
-      const persistentImpact = persistentImpacts[0];
-      entry.conflict = this.buildConflict(persistentImpact);
-      this.applyTerminalResolution(entry, persistentImpact, true);
-    }
+    entry.shiftCount = (entry.shiftCount ?? 0) + 1;
+    entry.timeContext.resolvedTimeInMinutes = entry.timeInMinutes;
+    entry.resolutionReasonCode = ConflictReasonCode.SHIFTED_BY_WINDOW_CONFLICT;
+    entry.resolutionReasonText = `Dose deslocada ${shiftWindow} minuto(s) por conflito clínico com ${impact.blockerEntry.medicationName}.`;
+    entry.note = entry.resolutionReasonText;
+    return true;
   }
 
-  private applyTerminalResolution(
+  private applyIterationLimit(entries: ConflictEntryLike[]): void {
+    const impacts = this.detectConflicts(entries);
+    const impactedEntries = new Map<string, RuleImpact>();
+
+    impacts.forEach((impact) => {
+      if (!impactedEntries.has(impact.adjustedEntry.stableKey)) {
+        impactedEntries.set(impact.adjustedEntry.stableKey, impact);
+      }
+    });
+
+    impactedEntries.forEach((impact) => {
+      const entry = impact.adjustedEntry;
+      entry.conflict = this.buildConflict(impact);
+      entry.status = ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED;
+      entry.resolutionReasonCode = ConflictReasonCode.MANUAL_REQUIRED_ITERATION_LIMIT;
+      entry.resolutionReasonText =
+        'ajuste manual exigido após atingir o limite de reavaliações do motor de conflitos.';
+      entry.note = entry.resolutionReasonText;
+    });
+  }
+
+  private applyInactiveResolution(entry: ConflictEntryLike, impact: RuleImpact): void {
+    entry.status = ScheduleStatus.INACTIVE;
+    entry.resolutionReasonCode = ConflictReasonCode.INACTIVATED_BY_MANDATORY_RULE;
+    entry.resolutionReasonText = `Dose inativada por regra clínica obrigatória associada a ${impact.blockerEntry.medicationName}.`;
+    entry.note = entry.resolutionReasonText;
+  }
+
+  private applyManualResolution(
     entry: ConflictEntryLike,
     impact: RuleImpact,
-    persistent: boolean,
+    reasonCode: ConflictReasonCode,
+    reasonText: string,
   ): void {
-    if (impact.rule.resolutionType === ClinicalResolutionType.INACTIVATE_SOURCE) {
-      entry.status = ScheduleStatus.INACTIVE;
-      entry.note = persistent
-        ? `Dose inativada após conflito persistente com ${impact.targetEntry.medicationName}.`
-        : `Dose inativada por conflito com ${impact.targetEntry.medicationName}.`;
-      return;
-    }
-
     entry.status = ScheduleStatus.MANUAL_ADJUSTMENT_REQUIRED;
-    entry.note = persistent
-      ? `ajuste manual exigido após conflito persistente com ${impact.targetEntry.medicationName}.`
-      : `ajuste manual exigido por conflito com ${impact.targetEntry.medicationName}.`;
+    entry.conflict = this.buildConflict(impact);
+    entry.resolutionReasonCode = reasonCode;
+    entry.resolutionReasonText = reasonText;
+    entry.note = reasonText;
+  }
+
+  private buildConflict(impact: RuleImpact): ScheduleConflictDto {
+    const [windowBefore, windowAfter] = impact.rule
+      ? this.resolveConflictWindows(impact.ruleOwnerEntry ?? impact.blockerEntry, impact.rule)
+      : [0, 0];
+
+    return {
+      interactionType: impact.rule?.interactionType,
+      resolutionType: impact.resolutionType,
+      matchKind: impact.matchKind,
+      triggerMedicationName: impact.blockerEntry.medicationName,
+      triggerGroupCode: impact.blockerEntry.groupCode,
+      triggerProtocolCode: impact.blockerEntry.protocolCode,
+      rulePriority: impact.rulePriority,
+      windowBeforeMinutes: windowBefore,
+      windowAfterMinutes: windowAfter,
+    };
+  }
+
+  private hasMatchingRuleBetween(left: ConflictEntryLike, right: ConflictEntryLike): boolean {
+    return (
+      left.interactionRulesSnapshot
+        .filter((rule) => this.isSupportedResolution(rule))
+        .some((rule) => this.matchesRule(left, right, rule)) ||
+      right.interactionRulesSnapshot
+        .filter((rule) => this.isSupportedResolution(rule))
+        .some((rule) => this.matchesRule(right, left, rule))
+    );
   }
 
   private matchesRule(
@@ -137,17 +327,11 @@ export class ConflictResolutionService {
     sourceEntry: ConflictEntryLike,
     rule: ClinicalInteractionRuleSnapshot,
   ): boolean {
-    if (
-      rule.targetGroupCode !== undefined &&
-      rule.targetGroupCode !== sourceEntry.groupCode
-    ) {
+    if (rule.targetGroupCode !== undefined && rule.targetGroupCode !== sourceEntry.groupCode) {
       return false;
     }
 
-    if (
-      rule.targetProtocolCode !== undefined &&
-      rule.targetProtocolCode !== sourceEntry.protocolCode
-    ) {
+    if (rule.targetProtocolCode !== undefined && rule.targetProtocolCode !== sourceEntry.protocolCode) {
       return false;
     }
 
@@ -158,24 +342,23 @@ export class ConflictResolutionService {
       return false;
     }
 
-    const interactionType = rule.interactionType;
     if (
-      interactionType === ClinicalInteractionType.AFFECTED_BY_SALTS &&
-      sourceEntry.groupCode !== 'GROUP_III_SAL'
+      rule.interactionType === ClinicalInteractionType.AFFECTED_BY_SALTS &&
+      sourceEntry.groupCode !== GroupCode.GROUP_III_SAL
     ) {
       return false;
     }
 
     if (
-      interactionType === ClinicalInteractionType.AFFECTED_BY_CALCIUM &&
-      sourceEntry.groupCode !== 'GROUP_III_CALC'
+      rule.interactionType === ClinicalInteractionType.AFFECTED_BY_CALCIUM &&
+      sourceEntry.groupCode !== GroupCode.GROUP_III_CALC
     ) {
       return false;
     }
 
     if (
-      interactionType === ClinicalInteractionType.AFFECTED_BY_SUCRALFATE &&
-      sourceEntry.groupCode !== 'GROUP_II_SUCRA'
+      rule.interactionType === ClinicalInteractionType.AFFECTED_BY_SUCRALFATE &&
+      sourceEntry.groupCode !== GroupCode.GROUP_II_SUCRA
     ) {
       return false;
     }
@@ -192,10 +375,7 @@ export class ConflictResolutionService {
       return true;
     }
 
-    const [windowBefore, windowAfter] = this.resolveConflictWindows(
-      targetEntry,
-      rule,
-    );
+    const [windowBefore, windowAfter] = this.resolveConflictWindows(targetEntry, rule);
 
     if (windowBefore === 0 && windowAfter === 0) {
       return false;
@@ -206,15 +386,6 @@ export class ConflictResolutionService {
       return delta <= windowAfter;
     }
     return Math.abs(delta) <= windowBefore;
-  }
-
-  private matchesRuleAtResolvedSlot(
-    targetEntry: ConflictEntryLike,
-    sourceEntry: ConflictEntryLike,
-    rule: ClinicalInteractionRuleSnapshot,
-  ): boolean {
-    return this.matchesRule(targetEntry, sourceEntry, rule)
-      && targetEntry.timeInMinutes === sourceEntry.timeInMinutes;
   }
 
   private resolveConflictWindows(
@@ -233,31 +404,88 @@ export class ConflictResolutionService {
     return [windowBefore, windowAfter];
   }
 
-  private resolveShiftWindow(rule: ClinicalInteractionRuleSnapshot): number {
+  private resolveShiftWindow(rule?: ClinicalInteractionRuleSnapshot): number {
     return (
-      rule.windowAfterMinutes ??
-      rule.windowMinutes ??
-      rule.windowBeforeMinutes ??
+      rule?.windowAfterMinutes ??
+      rule?.windowMinutes ??
+      rule?.windowBeforeMinutes ??
       60
     );
   }
 
-  private buildConflict(impact: RuleImpact): ScheduleConflictDto {
-    const [windowBefore, windowAfter] = this.resolveConflictWindows(
-      impact.targetEntry,
-      impact.rule,
-    );
+  private resolveMatchKind(
+    sourceEntry: ConflictEntryLike,
+    targetEntry: ConflictEntryLike,
+    rule: ClinicalInteractionRuleSnapshot,
+  ): ConflictMatchKind {
+    if (rule.resolutionType === ClinicalResolutionType.INACTIVATE_SOURCE) {
+      return ConflictMatchKind.MANDATORY_INACTIVATION;
+    }
+    if (sourceEntry.timeInMinutes === targetEntry.timeInMinutes) {
+      return ConflictMatchKind.EXACT_MINUTE;
+    }
+    return ConflictMatchKind.CLINICAL_WINDOW;
+  }
 
-    return {
-      interactionType: impact.rule.interactionType,
-      resolutionType: impact.rule.resolutionType,
-      triggerMedicationName: impact.targetEntry.medicationName,
-      triggerGroupCode: impact.targetEntry.groupCode,
-      triggerProtocolCode: impact.targetEntry.protocolCode,
-      rulePriority: impact.rule.priority,
-      windowBeforeMinutes: windowBefore,
-      windowAfterMinutes: windowAfter,
-    };
+  private compareImpacts(left: RuleImpact, right: RuleImpact): number {
+    const leftBlockerProtected = Number(this.isNonMovable(left.blockerEntry));
+    const rightBlockerProtected = Number(this.isNonMovable(right.blockerEntry));
+    const leftSeverity = this.resolutionSeverity(left.resolutionType);
+    const rightSeverity = this.resolutionSeverity(right.resolutionType);
+    const leftMatchPriority = this.matchKindPriority(left.matchKind);
+    const rightMatchPriority = this.matchKindPriority(right.matchKind);
+
+    return (
+      rightBlockerProtected - leftBlockerProtected ||
+      rightSeverity - leftSeverity ||
+      rightMatchPriority - leftMatchPriority ||
+      right.rulePriority - left.rulePriority ||
+      right.blockerEntry.protocolPriority - left.blockerEntry.protocolPriority ||
+      left.adjustedEntry.timeInMinutes - right.adjustedEntry.timeInMinutes ||
+      left.adjustedEntry.medicationName.localeCompare(right.adjustedEntry.medicationName) ||
+      left.adjustedEntry.phaseDoseLabel.localeCompare(right.adjustedEntry.phaseDoseLabel) ||
+      left.adjustedEntry.stableKey.localeCompare(right.adjustedEntry.stableKey)
+    );
+  }
+
+  private compareBlockerStrength(left: ConflictEntryLike, right: ConflictEntryLike): number {
+    return (
+      Number(this.isNonMovable(right)) - Number(this.isNonMovable(left)) ||
+      right.protocolPriority - left.protocolPriority ||
+      left.medicationName.localeCompare(right.medicationName) ||
+      left.phaseDoseLabel.localeCompare(right.phaseDoseLabel) ||
+      left.stableKey.localeCompare(right.stableKey)
+    );
+  }
+
+  private resolutionSeverity(resolutionType: ClinicalResolutionType): number {
+    switch (resolutionType) {
+      case ClinicalResolutionType.INACTIVATE_SOURCE:
+        return 3;
+      case ClinicalResolutionType.REQUIRE_MANUAL_ADJUSTMENT:
+        return 2;
+      case ClinicalResolutionType.SHIFT_SOURCE_BY_WINDOW:
+      default:
+        return 1;
+    }
+  }
+
+  private matchKindPriority(matchKind: ConflictMatchKind): number {
+    switch (matchKind) {
+      case ConflictMatchKind.PRIORITY_BLOCK:
+        return 4;
+      case ConflictMatchKind.MANDATORY_INACTIVATION:
+        return 3;
+      case ConflictMatchKind.EXACT_MINUTE:
+        return 2;
+      case ConflictMatchKind.CLINICAL_WINDOW:
+      default:
+        return 1;
+    }
+  }
+
+  private isNonMovable(entry: ConflictEntryLike): boolean {
+    return NON_MOVABLE_GROUPS.has(entry.groupCode);
   }
 
   private isSupportedResolution(rule: ClinicalInteractionRuleSnapshot): boolean {

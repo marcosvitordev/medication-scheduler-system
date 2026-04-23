@@ -7,6 +7,7 @@ import { ClinicalAnchor } from '../../../common/enums/clinical-anchor.enum';
 import { ClinicalInteractionType } from '../../../common/enums/clinical-interaction-type.enum';
 import { ClinicalResolutionType } from '../../../common/enums/clinical-resolution-type.enum';
 import { ClinicalSemanticTag } from '../../../common/enums/clinical-semantic-tag.enum';
+import { ConflictMatchKind } from '../../../common/enums/conflict-match-kind.enum';
 import { MonthlySpecialReference } from '../../../common/enums/monthly-special-reference.enum';
 
 export interface ResolvedScheduleTimeContextDto {
@@ -23,6 +24,7 @@ export interface ResolvedScheduleTimeContextDto {
 export interface ScheduleConflictDto {
   interactionType?: ClinicalInteractionType;
   resolutionType?: ClinicalResolutionType;
+  matchKind?: ConflictMatchKind;
   triggerMedicationName?: string;
   triggerGroupCode?: string;
   triggerProtocolCode?: string;
@@ -47,6 +49,8 @@ export interface ConflitoAgendamentoDto {
   tipo_interacao_label: string | null;
   tipo_resolucao_codigo: ClinicalResolutionType | null;
   tipo_resolucao_label: string | null;
+  tipo_match_codigo: ConflictMatchKind | null;
+  tipo_match_label: string | null;
   medicamento_disparador_nome: string | null;
   grupo_disparador_codigo: string | null;
   protocolo_disparador_codigo: string | null;
