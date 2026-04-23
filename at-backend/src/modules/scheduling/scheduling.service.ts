@@ -1169,7 +1169,7 @@ function toMonthlySpecialRule(
     return null;
   }
   const dataBaseClinica = toPtBrDate(phase.monthlySpecialBaseDate);
-  const monthlyReferenceDate = shiftDateByDays(
+  const monthlyReferenceDate = calculateMonthlySpecialReferenceDate(
     phase.monthlySpecialBaseDate,
     phase.monthlySpecialOffsetDays,
   );
@@ -1205,6 +1205,14 @@ function toMonthlySpecialReferenceLabel(
 
 function toMonthlySpecialDescription(offsetDays: number): string {
   return `Primeira aplicação: ${offsetDays}º dia após início da menstruação. Demais aplicações: mensal no mesmo dia do mês.`;
+}
+
+export function calculateMonthlySpecialReferenceDate(
+  baseDate: string,
+  clinicalOrdinalDay: number,
+): string {
+  // O dia-base é contado como dia clínico 1; o deslocamento matemático é ordinal - 1.
+  return shiftDateByDays(baseDate, clinicalOrdinalDay - 1);
 }
 
 function toGlycemiaScaleRanges(

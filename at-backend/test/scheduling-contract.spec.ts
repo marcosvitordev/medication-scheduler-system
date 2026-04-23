@@ -20,6 +20,7 @@ import {
   buildScheduleResult,
   createSchedulingService,
 } from "./helpers/scheduling-test-helpers";
+import { calculateMonthlySpecialReferenceDate } from "../src/modules/scheduling/scheduling.service";
 
 describe("SchedulingService final calendar JSON contract", () => {
   it("returns the top-level blocks required by the frontend/PDF", async () => {
@@ -225,6 +226,43 @@ describe("SchedulingService final calendar JSON contract", () => {
         "Primeira aplicação: 5º dia após início da menstruação. Demais aplicações: mensal no mesmo dia do mês.",
       ],
     ]);
+  });
+
+  it("calculates monthly special dates as inclusive clinical ordinal days", () => {
+    expect(calculateMonthlySpecialReferenceDate("2026-04-01", 8)).toBe(
+      "2026-04-08",
+    );
+    expect(calculateMonthlySpecialReferenceDate("2026-04-01", 5)).toBe(
+      "2026-04-05",
+    );
+    expect(calculateMonthlySpecialReferenceDate("2026-02-25", 8)).toBe(
+      "2026-03-04",
+    );
+  });
+
+  it("keeps the monthly contraceptive ordinal rule in the final calendar JSON", async () => {
+    const { service } = createSchedulingService();
+    const result = await buildScheduleResult(service, [
+      buildPrescriptionMedication({
+        medicationSnapshot: { commercialName: "PERLUTAN" },
+        phases: [
+          buildPhase({
+            phaseOrder: 1,
+            recurrenceType: TreatmentRecurrence.MONTHLY,
+            monthlyDay: undefined,
+            monthlySpecialReference: MonthlySpecialReference.MENSTRUATION_START,
+            monthlySpecialBaseDate: "2026-04-01",
+            monthlySpecialOffsetDays: 8,
+          }),
+        ],
+      }),
+    ]);
+
+    expect(result.scheduleItems[0]).toMatchObject({
+      medicamento: "PERLUTAN",
+      recorrenciaTexto:
+        "Primeira aplicação: 8º dia após início da menstruação. Demais aplicações: mensal no mesmo dia do mês.",
+    });
   });
 
   it("supports per-dose amounts in the final contract", async () => {
