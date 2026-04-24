@@ -205,6 +205,6 @@ horário final = horário base da rotina + offset da fórmula
 
 ---
 
-## 👨‍💻 Autor
+## 👨‍💻 Autores
 
-Desenvolvido por Marcos Vitor 🚀
+Desenvolvido por Marcos Vitor & Marcos Vinícius 🚀
