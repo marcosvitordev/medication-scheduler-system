@@ -14,6 +14,10 @@ import {
   CreateClinicalMedicationDto,
 } from '../src/modules/clinical-catalog/dto/create-clinical-medication.dto';
 import { CreatePatientPrescriptionPhaseDto } from '../src/modules/patient-prescriptions/dto/create-patient-prescription.dto';
+import {
+  UpdatePatientPrescriptionDto,
+  UpdatePatientPrescriptionMedicationOperationDto,
+} from '../src/modules/patient-prescriptions/dto/update-patient-prescription.dto';
 
 describe('New DTO clinical validation', () => {
   function validatePhase(overrides: Partial<CreatePatientPrescriptionPhaseDto> = {}): string[] {
@@ -32,6 +36,38 @@ describe('New DTO clinical validation', () => {
     });
 
     return flattenErrors(validateSync(phase));
+  }
+
+  function buildUpsertPhase(overrides = {}) {
+    return {
+      frequency: 1,
+      sameDosePerSchedule: true,
+      doseAmount: '1 COMP',
+      doseValue: '1',
+      doseUnit: DoseUnit.COMP,
+      recurrenceType: TreatmentRecurrence.DAILY,
+      treatmentDays: 7,
+      continuousUse: false,
+      manualAdjustmentEnabled: false,
+      ...overrides,
+    };
+  }
+
+  function validateMedicationUpdateOperation(overrides: Record<string, unknown> = {}): string[] {
+    const dto = plainToInstance(UpdatePatientPrescriptionMedicationOperationDto, {
+      prescriptionMedicationId: '11111111-1111-4111-8111-111111111111',
+      ...overrides,
+    });
+
+    return flattenErrors(validateSync(dto));
+  }
+
+  function validatePrescriptionUpdate(overrides: Record<string, unknown> = {}): string[] {
+    const dto = plainToInstance(UpdatePatientPrescriptionDto, {
+      ...overrides,
+    });
+
+    return flattenErrors(validateSync(dto));
   }
 
   it('rejects weekly recurrence without weeklyDay', () => {
@@ -295,6 +331,98 @@ describe('New DTO clinical validation', () => {
     });
 
     expect(flattenErrors(validateSync(dto))).toHaveLength(0);
+  });
+
+  it('rejects medication update operation without any action', () => {
+    expect(validateMedicationUpdateOperation()).toContain(
+      'Cada item de updateMedications deve informar protocolId, replacePhases, updatePhases ou removePhaseIds.',
+    );
+  });
+
+  it('accepts medication update operation with only protocolId', () => {
+    expect(
+      validateMedicationUpdateOperation({
+        protocolId: '22222222-2222-4222-8222-222222222222',
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts medication update operation with only replacePhases', () => {
+    expect(
+      validateMedicationUpdateOperation({
+        replacePhases: [buildUpsertPhase()],
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts medication update operation with only updatePhases', () => {
+    expect(
+      validateMedicationUpdateOperation({
+        updatePhases: [
+          {
+            phaseId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            frequency: 1,
+          },
+        ],
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts medication update operation with only removePhaseIds', () => {
+    expect(
+      validateMedicationUpdateOperation({
+        removePhaseIds: ['bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'],
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('rejects prescription update without any operation', () => {
+    expect(validatePrescriptionUpdate()).toContain(
+      'Informe ao menos uma operação: addMedications, updateMedications ou removeMedicationIds.',
+    );
+  });
+
+  it('accepts prescription update with only startedAt', () => {
+    expect(
+      validatePrescriptionUpdate({
+        startedAt: '2026-04-23',
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts prescription update with only addMedications', () => {
+    expect(
+      validatePrescriptionUpdate({
+        addMedications: [
+          {
+            clinicalMedicationId: '33333333-3333-4333-8333-333333333333',
+            protocolId: '44444444-4444-4444-8444-444444444444',
+            phases: [buildUpsertPhase()],
+          },
+        ],
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts prescription update with only updateMedications', () => {
+    expect(
+      validatePrescriptionUpdate({
+        updateMedications: [
+          {
+            prescriptionMedicationId: '55555555-5555-4555-8555-555555555555',
+            protocolId: '66666666-6666-4666-8666-666666666666',
+          },
+        ],
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('accepts prescription update with only removeMedicationIds', () => {
+    expect(
+      validatePrescriptionUpdate({
+        removeMedicationIds: ['77777777-7777-4777-8777-777777777777'],
+      }),
+    ).toHaveLength(0);
   });
 });
 

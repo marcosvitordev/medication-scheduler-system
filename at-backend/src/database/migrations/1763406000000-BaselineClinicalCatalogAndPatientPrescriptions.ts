@@ -8,6 +8,30 @@ export class BaselineClinicalCatalogAndPatientPrescriptions1763406000000
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
     await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS "patients" (
+        "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        "fullName" character varying(255) NOT NULL,
+        "birthDate" date NOT NULL,
+        "rg" character varying(255),
+        "cpf" character varying(255),
+        "phone" character varying(255)
+      )
+    `);
+    await queryRunner.query(`
+      CREATE TABLE IF NOT EXISTS "patient_routines" (
+        "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+        "acordar" time NOT NULL,
+        "cafe" time NOT NULL,
+        "almoco" time NOT NULL,
+        "lanche" time NOT NULL,
+        "jantar" time NOT NULL,
+        "dormir" time NOT NULL,
+        "active" boolean NOT NULL DEFAULT true,
+        "createdAt" timestamp with time zone NOT NULL DEFAULT now(),
+        "patientId" uuid NOT NULL REFERENCES "patients"("id") ON DELETE CASCADE
+      )
+    `);
+    await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "clinical_groups" (
         "id" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
         "code" character varying(60) NOT NULL UNIQUE,
@@ -189,6 +213,8 @@ export class BaselineClinicalCatalogAndPatientPrescriptions1763406000000
     await queryRunner.query(`DROP TABLE IF EXISTS "patient_prescription_phases"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "patient_prescription_medications"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "patient_prescriptions"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "patient_routines"`);
+    await queryRunner.query(`DROP TABLE IF EXISTS "patients"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "clinical_interaction_rules"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "clinical_protocol_steps"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "clinical_protocol_frequencies"`);

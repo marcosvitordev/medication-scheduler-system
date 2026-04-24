@@ -13,6 +13,7 @@ import {
   Min,
   Validate,
   ValidateNested,
+  ValidationArguments,
   ValidatorConstraint,
   ValidatorConstraintInterface,
 } from 'class-validator';
@@ -268,8 +269,8 @@ export class AddPatientPrescriptionMedicationDto {
 
 @ValidatorConstraint({ name: 'MedicationUpdateHasAction', async: false })
 class MedicationUpdateHasActionValidator implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
-    const medication = value as UpdatePatientPrescriptionMedicationOperationDto;
+  validate(_: unknown, args: ValidationArguments): boolean {
+    const medication = args.object as UpdatePatientPrescriptionMedicationOperationDto;
     return (
       Boolean(medication.protocolId) ||
       Boolean(medication.replacePhases?.length) ||
@@ -317,8 +318,8 @@ export class UpdatePatientPrescriptionMedicationOperationDto {
 
 @ValidatorConstraint({ name: 'UpdatePrescriptionHasOperation', async: false })
 class UpdatePrescriptionHasOperationValidator implements ValidatorConstraintInterface {
-  validate(value: unknown): boolean {
-    const dto = value as UpdatePatientPrescriptionDto;
+  validate(_: unknown, args: ValidationArguments): boolean {
+    const dto = args.object as UpdatePatientPrescriptionDto;
     return (
       Boolean(dto.startedAt) ||
       Boolean(dto.addMedications?.length) ||
