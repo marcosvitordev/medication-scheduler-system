@@ -1,6 +1,6 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { PatientRoutine } from './patient-routine.entity';
-import { Prescription } from '../../prescriptions/entities/prescription.entity';
+import { PatientPrescription } from '../../patient-prescriptions/entities/patient-prescription.entity';
 
 @Entity('patients')
 export class Patient {
@@ -25,6 +25,6 @@ export class Patient {
   @OneToMany(() => PatientRoutine, (routine) => routine.patient, { cascade: true })
   routines: PatientRoutine[];
 
-  @OneToMany(() => Prescription, (prescription) => prescription.patient)
-  prescriptions: Prescription[];
+  @OneToMany(() => PatientPrescription, (prescription) => prescription.patient)
+  prescriptions: PatientPrescription[];
 }

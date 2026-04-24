@@ -1,13 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../../app.module';
-import { MedicationService } from '../../modules/medications/medication.service';
+import { ClinicalCatalogService } from '../../modules/clinical-catalog/clinical-catalog.service';
 
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule);
-  const medicationService = app.get(MedicationService);
-  await medicationService.createDefaultGroups();
+  const clinicalCatalogService = app.get(ClinicalCatalogService);
+  await clinicalCatalogService.seedCatalog();
   await app.close();
-  console.log('Grupos padrão carregados com sucesso.');
+  console.log('Catálogo clínico padrão carregado com sucesso.');
 }
 
 run();

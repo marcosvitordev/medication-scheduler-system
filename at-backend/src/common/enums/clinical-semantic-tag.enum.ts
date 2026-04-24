@@ -1,0 +1,5 @@
+export enum ClinicalSemanticTag {
+  STANDARD = 'STANDARD',
+  BEDTIME_EQUIVALENT = 'BEDTIME_EQUIVALENT',
+  BEDTIME_SLOT = 'BEDTIME_SLOT',
+}

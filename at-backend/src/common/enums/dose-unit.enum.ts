@@ -1,0 +1,13 @@
+export enum DoseUnit {
+  COMP = 'COMP',
+  CAP = 'CAP',
+  DRAGEA = 'DRAGEA',
+  ML = 'ML',
+  GOTAS = 'GOTAS',
+  UI = 'UI',
+  JATOS = 'JATOS',
+  APLICADOR = 'APLICADOR',
+  BISNAGA = 'BISNAGA',
+  SUPOSITORIO = 'SUPOSITORIO',
+  AREA_AFETADA = 'AREA_AFETADA'
+}

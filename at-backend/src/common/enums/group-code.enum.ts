@@ -1,5 +1,6 @@
 export enum GroupCode {
   GROUP_I = 'GROUP_I',
+  GROUP_I_SIME = 'GROUP_I_SIME',
   GROUP_II = 'GROUP_II',
   GROUP_II_BIFOS = 'GROUP_II_BIFOS',
   GROUP_II_SUCRA = 'GROUP_II_SUCRA',
