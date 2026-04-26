@@ -314,6 +314,7 @@ Resposta esperada (resumo):
 
 ```json
 {
+  "prescriptionId": "0e0f81d1-5b93-4bcf-b8e1-b30439e7ef6a",
   "documentHeader": {
     "nomeEmpresa": "AT Farma",
     "cnpj": "12.345.678/0001-90"
@@ -333,6 +334,9 @@ Resposta esperada (resumo):
   },
   "scheduleItems": [
     {
+      "prescriptionMedicationId": "cc4f6578-78c7-4f2d-8f79-1946a8bfd7a2",
+      "phaseId": "7e6f7cb2-6f4a-4c07-83d7-8f52c7d466f1",
+      "phaseOrder": 1,
       "medicamento": "ALENDRONATO",
       "status": "Ativo",
       "doses": [
@@ -348,6 +352,15 @@ Resposta esperada (resumo):
   ]
 }
 ```
+
+Contrato vigente para frontend/demo:
+
+- `POST /patient-prescriptions`, `PATCH /patient-prescriptions/:id` e `GET /patient-prescriptions/:id/schedule` retornam o mesmo formato de calendario (`CalendarScheduleResponseDto`).
+- `prescriptionId` e o identificador usado em `PATCH /patient-prescriptions/:id`.
+- `scheduleItems[].prescriptionMedicationId` identifica o medicamento dentro da prescricao do paciente.
+- `scheduleItems[].phaseId` identifica a fase terapeutica dentro desse medicamento.
+- Para ajuste manual de uma fase, o frontend deve enviar `prescriptionId`, `prescriptionMedicationId` e `phaseId` retornados por este calendario.
+- O formato atual mistura chaves estruturais em camelCase com campos de exibicao em portugues; essa forma e o contrato oficial desta versao.
 
 ## Regras clinicas e resolucao de conflitos (backend)
 

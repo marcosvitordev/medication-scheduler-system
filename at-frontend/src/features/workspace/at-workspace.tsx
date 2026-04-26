@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertCircle,
   CalendarDays,
   CalendarPlus,
   Check,
@@ -16,6 +17,7 @@ import {
   Save,
   Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useFieldArray, useForm, type UseFormReturn } from "react-hook-form";
@@ -223,6 +225,7 @@ export function AtWorkspace() {
   const [schedule, setSchedule] = useState<CalendarScheduleResponseDto | null>(null);
   const [reviewValues, setReviewValues] = useState<PrescriptionFormValues | null>(null);
   const [selectedDoseKey, setSelectedDoseKey] = useState<string | null>(null);
+  const [confirmGenerateOpen, setConfirmGenerateOpen] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const patientsQuery = useQuery({
@@ -292,6 +295,15 @@ export function AtWorkspace() {
 	      const protocol = resolveProtocol(catalogMedication, medication.protocolId);
 	      return isPrescriptionMedicationComplete(medication, protocol, catalogMedication);
 	    });
+  const prescriptionReadinessMessage = getPrescriptionReadinessMessage({
+    activeRoutine,
+    catalog: catalogQuery.data ?? [],
+    medications: watchedPrescriptionMedications,
+    selectedPatient,
+    startedAt: prescriptionForm.watch("startedAt"),
+  });
+  const reviewSnapshot = reviewValues ?? prescriptionForm.getValues();
+  const reviewStats = getPrescriptionReviewStats(reviewSnapshot);
 
   useEffect(() => {
     if (!selectedPhaseDoses.length) {
@@ -346,8 +358,19 @@ export function AtWorkspace() {
         banho: values.banho || null,
       });
     },
-    onSuccess: () => {
+    onSuccess: (routine) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.patients });
+      setSelectedPatient((current) =>
+        current
+          ? {
+              ...current,
+              routines: [
+                ...(current.routines ?? []).map((item) => ({ ...item, active: false })),
+                routine,
+              ],
+            }
+          : current,
+      );
       setCurrentStep("prescription");
       setMessage({
         tone: "success",
@@ -635,6 +658,7 @@ export function AtWorkspace() {
 	    setSchedule(null);
 	    setReviewValues(null);
 	    setSelectedDoseKey(null);
+    setConfirmGenerateOpen(false);
     setMessage(null);
     patientForm.reset(emptyPatientForm);
     routineForm.reset(emptyRoutineForm);
@@ -656,13 +680,20 @@ export function AtWorkspace() {
   function submitPrescriptionForReview(values: PrescriptionFormValues) {
     setReviewValues(values);
     setCurrentStep("review");
+    setConfirmGenerateOpen(false);
     setMessage(null);
   }
 
+  function confirmPrescriptionGeneration() {
+    const values = reviewValues ?? prescriptionForm.getValues();
+    setConfirmGenerateOpen(false);
+    createPrescriptionMutation.mutate(values);
+  }
+
   return (
-    <main className="grid min-h-screen grid-cols-1 bg-background lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="border-r bg-white p-4 lg:min-h-screen lg:p-6">
-        <div className="mb-6 flex items-center gap-3">
+    <main className="grid min-h-screen grid-cols-1 bg-background xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="border-b bg-white p-4 xl:min-h-screen xl:border-b-0 xl:border-r xl:p-6">
+        <div className="mb-5 flex items-center gap-3 xl:mb-6">
           <div className="grid size-11 place-items-center rounded-md bg-primary text-sm font-black text-primary-foreground">
             AT
           </div>
@@ -672,12 +703,12 @@ export function AtWorkspace() {
           </div>
         </div>
 
-        <nav className="grid grid-cols-5 gap-2 lg:grid-cols-1">
+        <nav className="grid grid-cols-5 gap-2 xl:grid-cols-1">
           {steps.map((step) => {
             const Icon = step.icon;
             return (
               <button
-                className={`focus-ring flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm font-semibold lg:justify-start ${
+                className={`focus-ring flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border px-2 text-xs font-semibold sm:text-sm xl:justify-start xl:px-3 ${
                   currentStep === step.id
                     ? "border-primary/35 bg-primary/10 text-primary"
                     : "border-transparent text-muted-foreground hover:bg-muted"
@@ -687,13 +718,13 @@ export function AtWorkspace() {
                 type="button"
               >
                 <Icon className="size-4" />
-                <span className="hidden lg:inline">{step.label}</span>
+                <span className="hidden sm:inline xl:inline">{step.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <Panel className="mt-6 shadow-none">
+        <Panel className="mt-5 hidden shadow-none md:block xl:mt-6">
           <p className="mb-3 text-xs font-bold uppercase text-muted-foreground">Estado</p>
           <AuditRow label="Paciente" value={selectedPatient?.fullName ?? "Pendente"} />
           <AuditRow
@@ -724,13 +755,14 @@ export function AtWorkspace() {
 
         {message ? (
           <div
-            className={`mb-4 rounded-md border p-3 text-sm font-semibold ${
+            className={`mb-4 flex items-start gap-3 rounded-md border p-3 text-sm font-semibold ${
               message.tone === "success"
                 ? "border-success/30 bg-success/10 text-success"
                 : "border-destructive/30 bg-destructive/10 text-destructive"
             }`}
           >
-            {message.text}
+            {message.tone === "success" ? <Check className="mt-0.5 size-4 shrink-0" /> : <AlertCircle className="mt-0.5 size-4 shrink-0" />}
+            <span>{message.text}</span>
           </div>
         ) : null}
 
@@ -811,7 +843,12 @@ export function AtWorkspace() {
                     </button>
                   ))}
                   {!patientsQuery.isLoading && !patientsQuery.data?.length ? (
-                    <span className="text-sm text-muted-foreground">Nenhum paciente cadastrado.</span>
+                    <EmptyState
+                      actionLabel="Preencher cadastro"
+                      description="Use o formulário ao lado para iniciar o atendimento. O paciente ficará disponível nesta lista depois de salvo."
+                      onAction={() => patientForm.setFocus("fullName")}
+                      title="Nenhum paciente cadastrado"
+                    />
                   ) : null}
                 </div>
               </div>
@@ -890,17 +927,30 @@ export function AtWorkspace() {
               title="Montagem da prescrição"
             />
 
-            {catalogQuery.data?.length === 0 ? (
-              <div className="mb-4 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-warning">
-                Catálogo vazio. Use o botão “Popular catálogo” antes de criar a prescrição.
+            {catalogQuery.isLoading ? (
+              <div className="mb-4 rounded-md border bg-muted/30 p-3 text-sm font-semibold text-muted-foreground">
+                Carregando catálogo clínico...
               </div>
+            ) : null}
+            {catalogQuery.isError ? (
+              <div className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm font-semibold text-destructive">
+                Não foi possível carregar o catálogo. Confirme se o backend está rodando e recarregue a tela.
+              </div>
+            ) : null}
+            {catalogQuery.data?.length === 0 ? (
+              <EmptyState
+                actionLabel="Popular catálogo"
+                description="O backend ainda não tem medicamentos disponíveis para o formulário. Execute o seed pelo botão acima e aguarde a lista carregar."
+                onAction={() => seedCatalogMutation.mutate()}
+                title="Catálogo clínico vazio"
+              />
             ) : null}
 
 	            <form
 	              className="grid gap-5"
 	              onSubmit={prescriptionForm.handleSubmit(submitPrescriptionForReview)}
 	            >
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                 <Field error={prescriptionForm.formState.errors.startedAt?.message} label="Início">
                   <input className={inputClassName} type="date" {...prescriptionForm.register("startedAt")} />
                 </Field>
@@ -929,6 +979,16 @@ export function AtWorkspace() {
                 ))}
               </div>
 
+              {prescriptionReadinessMessage ? (
+                <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm font-semibold text-warning">
+                  {prescriptionReadinessMessage}
+                </div>
+              ) : (
+                <div className="rounded-md border border-success/30 bg-success/10 p-3 text-sm font-semibold text-success">
+                  Prescrição pronta para revisão. Confira o resumo antes de gerar o calendário.
+                </div>
+              )}
+
               <div className="flex justify-between gap-3">
                 <Button onClick={() => setCurrentStep("routine")} type="button" variant="secondary">
                   Voltar
@@ -938,6 +998,7 @@ export function AtWorkspace() {
 	                    !selectedPatient ||
 	                    !prescriptionForm.watch("startedAt") ||
 	                    !prescriptionCardsAreComplete ||
+	                    Boolean(prescriptionReadinessMessage) ||
 	                    createPrescriptionMutation.isPending
 	                  }
 	                  type="submit"
@@ -956,14 +1017,22 @@ export function AtWorkspace() {
 	            catalog={catalogQuery.data ?? []}
 	            isPending={createPrescriptionMutation.isPending}
 	            onBack={() => setCurrentStep("prescription")}
-	            onConfirm={() => {
-	              const values = reviewValues ?? prescriptionForm.getValues();
-	              createPrescriptionMutation.mutate(values);
-	            }}
+	            onConfirm={() => setConfirmGenerateOpen(true)}
 	            patient={selectedPatient}
-	            values={reviewValues ?? prescriptionForm.getValues()}
+	            values={reviewSnapshot}
 	          />
 	        ) : null}
+
+        {confirmGenerateOpen ? (
+          <ConfirmGenerateDialog
+            isPending={createPrescriptionMutation.isPending}
+            onCancel={() => setConfirmGenerateOpen(false)}
+            onConfirm={confirmPrescriptionGeneration}
+            patient={selectedPatient}
+            stats={reviewStats}
+            values={reviewSnapshot}
+          />
+        ) : null}
 
         {currentStep === "calendar" ? (
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -998,7 +1067,7 @@ export function AtWorkspace() {
                         Este ajuste vale para a fase inteira, não apenas para a dose selecionada. Informe um horário para cada dose da fase {selectedDose.item.phaseOrder}.
                       </p>
                       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                           {selectedPhaseDoses.map((entry, index) => (
                             <Field
                               error={manualForm.formState.errors.times?.[index]?.message}
@@ -1036,15 +1105,25 @@ export function AtWorkspace() {
                   ) : null}
                 </>
               ) : (
-                <div className="rounded-md border bg-muted/40 p-6 text-sm text-muted-foreground">
-                  Nenhum calendário gerado nesta sessão.
-                </div>
+                <EmptyState
+                  actionLabel={reviewValues ? "Voltar ao resumo" : "Montar prescrição"}
+                  description="O calendário só é criado depois da confirmação final. Revise a prescrição antes de gerar a agenda posológica."
+                  onAction={() => setCurrentStep(reviewValues ? "review" : "prescription")}
+                  title="Nenhum calendário gerado nesta sessão"
+                />
               )}
             </Panel>
 
             <Panel className="xl:sticky xl:top-6 xl:self-start">
               <PanelHeader eyebrow="Dose selecionada" title={selectedDose?.item.medicamento ?? "Sem seleção"} />
-              {selectedDose ? <DoseDetails selectedDose={selectedDose} /> : <p className="text-sm text-muted-foreground">Selecione uma dose.</p>}
+              {selectedDose ? (
+                <DoseDetails selectedDose={selectedDose} />
+              ) : (
+                <EmptyState
+                  description="Clique em uma dose do calendário para ver status, conflito, modo de uso e ajuste manual da fase."
+                  title="Nenhuma dose selecionada"
+                />
+              )}
             </Panel>
           </div>
         ) : null}
@@ -1058,6 +1137,33 @@ function AuditRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3 py-1 text-sm">
       <span className="text-muted-foreground">{label}</span>
       <strong className="text-right">{value}</strong>
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-dashed bg-muted/30 p-5 text-sm">
+      <div className="mb-2 flex items-center gap-2 font-bold">
+        <AlertCircle className="size-4 text-muted-foreground" />
+        {title}
+      </div>
+      <p className="text-muted-foreground">{description}</p>
+      {actionLabel && onAction ? (
+        <Button className="mt-4" onClick={onAction} size="sm" type="button" variant="secondary">
+          {actionLabel}
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -1192,7 +1298,7 @@ function PrescriptionMedicationCard({
 	        </div>
 	      </div>
 
-	      <div className="grid gap-4 lg:grid-cols-2">
+	      <div className="grid gap-4 md:grid-cols-2">
         <Field error={errors?.clinicalMedicationId?.message} label="Medicamento">
           <select
             className={inputClassName}
@@ -1338,7 +1444,7 @@ function PrescriptionPhaseCard({
         </Button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3">
         <Field error={errors?.frequency?.message} label="Frequência">
           <select
             className={inputClassName}
@@ -1399,7 +1505,7 @@ function PrescriptionPhaseCard({
       </div>
 
 	      {phase.recurrenceType !== "DAILY" ? (
-	        <div className="mt-4 grid gap-4 rounded-md border bg-white p-4 lg:grid-cols-3">
+	        <div className="mt-4 grid gap-4 rounded-md border bg-white p-4 md:grid-cols-3">
           {phase.recurrenceType === "WEEKLY" ? (
             <Field error={errors?.weeklyDay?.message} label="Dia da semana">
               <select className={inputClassName} {...form.register(`${phaseName}.weeklyDay`)}>
@@ -1463,7 +1569,7 @@ function PrescriptionPhaseCard({
 	            <Badge variant="warning">Sprint 6</Badge>
 	          </div>
 
-	          <div className="grid gap-4 lg:grid-cols-3">
+	          <div className="grid gap-4 md:grid-cols-3">
 	            {selectedMedication?.isOphthalmic ? (
 	              <Field error={errors?.ocularLaterality?.message} label="Lateralidade ocular">
 	                <select className={inputClassName} {...form.register(`${phaseName}.ocularLaterality`)}>
@@ -1526,7 +1632,7 @@ function PrescriptionPhaseCard({
 	                <div className="grid gap-3">
 	                  {glycemiaRanges.map((_, rangeIndex) => (
 	                    <div
-	                      className="grid gap-3 rounded-md border bg-white p-3 lg:grid-cols-[1fr_1fr_1fr_1fr_auto]"
+	                      className="grid gap-3 rounded-md border bg-white p-3 md:grid-cols-[1fr_1fr] xl:grid-cols-[1fr_1fr_1fr_1fr_auto]"
 	                      key={`glycemia-${medicationIndex}-${phaseIndex}-${rangeIndex}`}
 	                    >
 	                      <Field error={errors?.glycemiaScaleRanges?.[rangeIndex]?.minimum?.message} label="Mínimo">
@@ -1606,7 +1712,7 @@ function PrescriptionPhaseCard({
         </p>
       ) : null}
 
-      <div className="mt-4 grid gap-3 rounded-md border bg-white p-4 lg:grid-cols-3">
+      <div className="mt-4 grid gap-3 rounded-md border bg-white p-4 md:grid-cols-3">
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input
             checked={phase.sameDosePerSchedule}
@@ -1662,7 +1768,7 @@ function PrescriptionPhaseCard({
             Informe dose e unidade para todos os horários da fase.
           </p>
           {selectedFrequency > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               {Array.from({ length: selectedFrequency }, (_, overrideIndex) => (
                 <div
                   className="grid gap-3 rounded-md border bg-white p-3"
@@ -1716,7 +1822,7 @@ function PrescriptionPhaseCard({
             O ajuste manual vale para a fase inteira; informe todos os horários da fase.
           </p>
           {selectedFrequency > 0 ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
               {Array.from({ length: selectedFrequency }, (_, manualIndex) => (
                 <Field
                   error={errors?.manualTimes?.[manualIndex]?.message}
@@ -1854,27 +1960,41 @@ function PrescriptionReviewPanel({
   patient: Patient | null;
   values: PrescriptionFormValues;
 }) {
+  const stats = getPrescriptionReviewStats(values);
+
   return (
     <Panel className="max-w-6xl">
-      <PanelHeader eyebrow="Revisão final" title={patient?.fullName ?? "Paciente pendente"} />
+      <PanelHeader
+        action={<Badge variant={patient && activeRoutine ? "success" : "warning"}>{patient && activeRoutine ? "Pronto para confirmar" : "Pendências"}</Badge>}
+        eyebrow="Revisão final"
+        title={patient?.fullName ?? "Paciente pendente"}
+      />
 
       <div className="grid gap-4">
-        <div className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm md:grid-cols-3">
+        <div className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm md:grid-cols-2 xl:grid-cols-4">
           <DetailBlock label="Paciente" value={patient?.fullName ?? "Pendente"} hint={formatCpf(patient?.cpf) ?? patient?.phone ?? "Sem contato"} />
           <DetailBlock label="Início" value={values.startedAt || "Pendente"} />
+          <DetailBlock label="Medicamentos" value={`${stats.medications} item(ns)`} hint={`${stats.phases} fase(s) · ${stats.estimatedDoses} dose(s) por ciclo`} />
           <DetailBlock label="Rotina" value={activeRoutine ? "Rotina ativa selecionada" : "Pendente"} />
+        </div>
+
+        <div className="grid gap-3 rounded-md border bg-white p-4 text-sm md:grid-cols-4">
+          <strong className="md:col-span-4">Rotina usada no calendário</strong>
           {activeRoutine
             ? routineFields.map((field) => (
                 <span className="text-muted-foreground" key={field.name}>
                   {field.label}: <strong className="text-foreground">{activeRoutine[field.name] ?? "--:--"}</strong>
                 </span>
               ))
-            : null}
+            : (
+              <span className="text-warning md:col-span-4">Cadastre ou selecione uma rotina ativa antes de gerar o calendário.</span>
+            )}
         </div>
 
         {values.medications.map((medicationValue, medicationIndex) => {
           const medication = resolveMedication(catalog, medicationValue.clinicalMedicationId);
           const protocol = resolveProtocol(medication, medicationValue.protocolId);
+          const complete = isPrescriptionMedicationComplete(medicationValue, protocol, medication);
           return (
             <article className="rounded-md border bg-white p-4" key={`review-medication-${medicationIndex}`}>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -1884,19 +2004,44 @@ function PrescriptionReviewPanel({
                   </h3>
                   <p className="text-sm text-muted-foreground">{protocol?.name ?? "Protocolo pendente"}</p>
                 </div>
-                <Badge variant={isPrescriptionMedicationComplete(medicationValue, protocol, medication) ? "success" : "warning"}>
-                  {medicationValue.phases.length} fase(s)
-                </Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={complete ? "success" : "warning"}>{complete ? "Completo" : "Pendente"}</Badge>
+                  <Badge>{medicationValue.phases.length} fase(s)</Badge>
+                </div>
               </div>
               <div className="grid gap-3">
                 {medicationValue.phases.map((phase, phaseIndex) => (
                   <div className="rounded-md border bg-muted/20 p-3" key={`review-medication-${medicationIndex}-phase-${phaseIndex}`}>
-                    <strong className="mb-2 block">Fase {phaseIndex + 1}</strong>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <strong>Fase {phaseIndex + 1}</strong>
+                      <Badge
+                        variant={
+                          isPrescriptionPhaseComplete(
+                            phase,
+                            phaseIndex === medicationValue.phases.length - 1,
+                            resolveFrequencyConfig(protocol, phase.frequency),
+                            medication,
+                          )
+                            ? "success"
+                            : "warning"
+                        }
+                      >
+                        {isPrescriptionPhaseComplete(
+                          phase,
+                          phaseIndex === medicationValue.phases.length - 1,
+                          resolveFrequencyConfig(protocol, phase.frequency),
+                          medication,
+                        )
+                          ? "Pronta"
+                          : "Revisar"}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs">
                       {buildPhaseSummaryBadges(phase, medication, resolveFrequencyConfig(protocol, phase.frequency)).map((label) => (
                         <Badge key={label}>{label}</Badge>
                       ))}
                     </div>
+                    <ReviewPhaseDetails phase={phase} medication={medication} />
                   </div>
                 ))}
               </div>
@@ -1915,6 +2060,94 @@ function PrescriptionReviewPanel({
         </div>
       </div>
     </Panel>
+  );
+}
+
+function ReviewPhaseDetails({
+  phase,
+  medication,
+}: {
+  phase: PrescriptionPhaseFormValues;
+  medication: ClinicalMedication | null;
+}) {
+  const rows = [
+    phase.sameDosePerSchedule
+      ? null
+      : `Dose variável: ${(phase.perDoseOverrides ?? [])
+          .map((dose) => `${dose.doseLabel} ${dose.doseValue || "?"} ${toDoseUnitLabel(dose.doseUnit) || "?"}`)
+          .join(" · ")}`,
+    phase.manualAdjustmentEnabled ? `Horários manuais: ${(phase.manualTimes ?? []).filter(Boolean).join(", ") || "pendente"}` : null,
+    medication?.requiresGlycemiaScale
+      ? `Escala glicêmica: ${(phase.glycemiaScaleRanges ?? [])
+          .map((range) => `${range.minimum ?? "?"}-${range.maximum ?? "?"}: ${range.doseValue || "?"} ${toDoseUnitLabel(range.doseUnit) || "?"}`)
+          .join(" · ") || "pendente"}`
+      : null,
+    medication?.isContraceptiveMonthly
+      ? `Mensal especial: menstruação em ${phase.monthlySpecialBaseDate || "data pendente"} + ${phase.monthlySpecialOffsetDays ?? "?"} dia(s)`
+      : null,
+  ].filter((row): row is string => Boolean(row));
+
+  if (!rows.length) return null;
+
+  return (
+    <div className="mt-3 grid gap-1 border-t pt-3 text-sm text-muted-foreground">
+      {rows.map((row) => (
+        <span key={row}>{row}</span>
+      ))}
+    </div>
+  );
+}
+
+function ConfirmGenerateDialog({
+  isPending,
+  onCancel,
+  onConfirm,
+  patient,
+  stats,
+  values,
+}: {
+  isPending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  patient: Patient | null;
+  stats: ReturnType<typeof getPrescriptionReviewStats>;
+  values: PrescriptionFormValues;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/35 p-4" role="dialog" aria-modal="true">
+      <div className="w-full max-w-xl rounded-md border bg-white p-5 shadow-panel">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase text-muted-foreground">Confirmação final</p>
+            <h2 className="text-lg font-bold leading-tight">Gerar calendário posológico?</h2>
+          </div>
+          <Button aria-label="Fechar confirmação" disabled={isPending} onClick={onCancel} size="icon" type="button" variant="ghost">
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm sm:grid-cols-2">
+          <DetailBlock label="Paciente" value={patient?.fullName ?? "Pendente"} hint={formatCpf(patient?.cpf) ?? patient?.phone ?? "Sem contato"} />
+          <DetailBlock label="Início" value={values.startedAt || "Pendente"} />
+          <DetailBlock label="Medicamentos" value={`${stats.medications} item(ns)`} />
+          <DetailBlock label="Fases e doses" value={`${stats.phases} fase(s) · ${stats.estimatedDoses} dose(s)`} />
+        </div>
+
+        <p className="mt-4 text-sm text-muted-foreground">
+          Depois de confirmar, a prescrição será salva no backend e o calendário será gerado com as regras clínicas atuais. Para corrigir dados, cancele e volte ao resumo.
+        </p>
+
+        <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <Button disabled={isPending} onClick={onCancel} type="button" variant="secondary">
+            Cancelar e revisar
+          </Button>
+          <Button disabled={isPending || !patient} onClick={onConfirm} type="button">
+            {isPending ? <Loader2 className="size-4 animate-spin" /> : <CalendarPlus className="size-4" />}
+            Gerar calendário
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1950,6 +2183,15 @@ function DoseBoard({
   onSelect: (dose: SelectedDose) => void;
   onAdjust: (dose: SelectedDose) => void;
 }) {
+  if (!doses.length) {
+    return (
+      <EmptyState
+        description="A agenda foi criada, mas não há doses para exibir. Revise a prescrição ou gere novamente depois de corrigir os dados."
+        title="Calendário sem doses"
+      />
+    );
+  }
+
   return (
     <div className="grid gap-2">
       {doses.map((entry) => (
@@ -2110,6 +2352,57 @@ function isRecurrenceAllowed(recurrenceType: TreatmentRecurrence, frequencyConfi
 
 function getDefaultRecurrenceForFrequency(frequencyConfig: ClinicalProtocolFrequency | null): TreatmentRecurrence {
   return getAllowedRecurrenceOptions(frequencyConfig)[0]?.value ?? "DAILY";
+}
+
+function getPrescriptionReviewStats(values: PrescriptionFormValues) {
+  const medications = values.medications.length;
+  const phases = values.medications.reduce((total, medication) => total + medication.phases.length, 0);
+  const estimatedDoses = values.medications.reduce(
+    (total, medication) =>
+      total + medication.phases.reduce((phaseTotal, phase) => phaseTotal + (Number(phase.frequency) || 0), 0),
+    0,
+  );
+
+  return { medications, phases, estimatedDoses };
+}
+
+function getPrescriptionReadinessMessage({
+  activeRoutine,
+  catalog,
+  medications,
+  selectedPatient,
+  startedAt,
+}: {
+  activeRoutine: PatientRoutine | null;
+  catalog: ClinicalMedication[];
+  medications: PrescriptionMedicationFormValues[];
+  selectedPatient: Patient | null;
+  startedAt: string;
+}) {
+  if (!selectedPatient) return "Selecione ou cadastre um paciente antes de revisar a prescrição.";
+  if (!activeRoutine) return "Cadastre uma rotina ativa para o paciente antes de gerar o calendário.";
+  if (catalog.length === 0) return "Popule o catálogo clínico para liberar medicamentos e protocolos.";
+  if (!startedAt) return "Informe a data de início da prescrição.";
+  if (!medications.length) return "Adicione ao menos um medicamento.";
+
+  for (const [medicationIndex, medication] of medications.entries()) {
+    const catalogMedication = resolveMedication(catalog, medication.clinicalMedicationId);
+    const protocol = resolveProtocol(catalogMedication, medication.protocolId);
+    const label = catalogMedication?.commercialName ?? catalogMedication?.activePrinciple ?? `Medicamento ${medicationIndex + 1}`;
+
+    if (!catalogMedication) return `Selecione o medicamento do item ${medicationIndex + 1}.`;
+    if (!protocol) return `Selecione o protocolo de ${label}.`;
+    if (!medication.phases.length) return `${label} precisa ter ao menos uma fase.`;
+
+    for (const [phaseIndex, phase] of medication.phases.entries()) {
+      const frequencyConfig = resolveFrequencyConfig(protocol, phase.frequency);
+      if (!isPrescriptionPhaseComplete(phase, phaseIndex === medication.phases.length - 1, frequencyConfig, catalogMedication)) {
+        return `Revise a fase ${phaseIndex + 1} de ${label}: frequência, dose, recorrência, duração e campos clínicos devem estar completos.`;
+      }
+    }
+  }
+
+  return null;
 }
 
 function isPrescriptionPhaseManualTimesComplete(phase: PrescriptionPhaseFormValues) {

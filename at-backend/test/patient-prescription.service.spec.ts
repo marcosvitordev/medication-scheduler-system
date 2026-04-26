@@ -10,9 +10,11 @@ import { MonthlySpecialReference } from '../src/common/enums/monthly-special-ref
 import { OcularLaterality } from '../src/common/enums/ocular-laterality.enum';
 import { OticLaterality } from '../src/common/enums/otic-laterality.enum';
 import { PrnReason } from '../src/common/enums/prn-reason.enum';
+import { ScheduleStatus } from '../src/common/enums/schedule-status.enum';
 import { TreatmentRecurrence } from '../src/common/enums/treatment-recurrence.enum';
 import { PatientPrescriptionPhase } from '../src/modules/patient-prescriptions/entities/patient-prescription-phase.entity';
 import { PatientPrescriptionService } from '../src/modules/patient-prescriptions/patient-prescription.service';
+import { CalendarScheduleResponseDto } from '../src/modules/scheduling/dto/calendar-schedule-response.dto';
 
 describe('PatientPrescriptionService', () => {
   function createService() {
@@ -103,6 +105,84 @@ describe('PatientPrescriptionService', () => {
         (service as unknown as { clinicalCatalogService: { findMedicationById: jest.Mock } })
           .clinicalCatalogService,
       phaseDoseRepository,
+    };
+  }
+
+  function buildCalendarContractResponse(
+    overrides: Partial<CalendarScheduleResponseDto> = {},
+  ): CalendarScheduleResponseDto {
+    return {
+      prescriptionId: 'rx-1',
+      documentHeader: {
+        nomeEmpresa: 'AT Farma',
+        cnpj: '12.345.678/0001-90',
+        telefone: '(68)3333-4444',
+        email: 'contato@atfarma.com.br',
+        farmaceuticoNome: 'Farmacêutica Teste',
+        farmaceuticoCrf: 'CRF-AC 1234',
+      },
+      patient: {
+        id: 'patient-1',
+        nome: 'Paciente Teste',
+        dataNascimento: '01/01/1970',
+        idade: 56,
+        rg: null,
+        cpf: null,
+        telefone: null,
+      },
+      routine: {
+        acordar: '06:00',
+        cafe: '07:00',
+        almoco: '12:00',
+        lanche: '15:00',
+        jantar: '19:00',
+        dormir: '22:00',
+        banho: null,
+      },
+      scheduleItems: [
+        {
+          prescriptionMedicationId: 'prescription-medication-1',
+          phaseId: 'phase-1',
+          phaseOrder: 1,
+          medicamento: 'LOSARTANA',
+          principioAtivo: 'Losartana potassica',
+          apresentacao: 'Comprimido revestido',
+          formaFarmaceutica: null,
+          via: 'VO',
+          modoUso: 'Conforme prescricao.',
+          recorrenciaTexto: 'Diário',
+          inicio: '21/04/2026',
+          termino: '30/04/2026',
+          status: 'Ativo',
+          observacoes: [],
+          doses: [
+            {
+              label: 'D1',
+              horario: '07:00',
+              doseValor: '1',
+              doseUnidade: DoseUnit.COMP,
+              doseExibicao: '1 COMP',
+              status: ScheduleStatus.ACTIVE,
+              statusLabel: 'Ativo',
+              observacao: null,
+              reasonCode: null,
+              reasonText: null,
+              contextoHorario: {
+                ancora: ClinicalAnchor.CAFE,
+                ancora_horario_minutos: 420,
+                deslocamento_minutos: 0,
+                tag_semantica: ClinicalSemanticTag.STANDARD,
+                horario_original_minutos: 420,
+                horario_original: '07:00',
+                horario_resolvido_minutos: 420,
+                horario_resolvido: '07:00',
+              },
+              conflito: null,
+            },
+          ],
+        },
+      ],
+      ...overrides,
     };
   }
 
@@ -294,6 +374,9 @@ describe('PatientPrescriptionService', () => {
     };
 
     clinicalCatalogService.findMedicationById.mockResolvedValue(clinicalMedication);
+    (schedulingService.buildAndPersistSchedule as jest.Mock).mockResolvedValueOnce(
+      buildCalendarContractResponse(),
+    );
     prescriptionRepository.findOne.mockImplementation(async ({ where }: { where: { id: string } }) => ({
       id: where.id,
       patient: { id: 'patient-1' },
@@ -405,8 +488,21 @@ describe('PatientPrescriptionService', () => {
       ],
     });
     expect(result).toMatchObject({
-      patientId: 'patient-1',
       prescriptionId: 'rx-1',
+      scheduleItems: [
+        {
+          prescriptionMedicationId: 'prescription-medication-1',
+          phaseId: 'phase-1',
+          phaseOrder: 1,
+          doses: [
+            {
+              label: 'D1',
+              horario: '07:00',
+              status: ScheduleStatus.ACTIVE,
+            },
+          ],
+        },
+      ],
     });
   });
 
@@ -2778,6 +2874,51 @@ describe('PatientPrescriptionService', () => {
       '2026-06-01',
     );
     expect(result).toEqual({ prescriptionId: 'rx-1', medicationCount: 1 });
+  });
+
+  it('returns the official calendar contract after updating a prescription', async () => {
+    const { service, schedulingService } = createUpdateServiceHarness();
+    (schedulingService.buildAndPersistSchedule as jest.Mock).mockResolvedValueOnce(
+      buildCalendarContractResponse({
+        scheduleItems: [
+          {
+            ...buildCalendarContractResponse().scheduleItems[0],
+            prescriptionMedicationId: 'med-1',
+            phaseId: 'phase-1',
+          },
+        ],
+      }),
+    );
+
+    const result = await service.updatePrescription('rx-1', {
+      updateMedications: [
+        {
+          prescriptionMedicationId: 'med-1',
+          updatePhases: [
+            {
+              phaseId: 'phase-1',
+              manualAdjustmentEnabled: true,
+              manualTimes: ['09:00'],
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    expect(result).toMatchObject({
+      prescriptionId: 'rx-1',
+      documentHeader: expect.any(Object),
+      patient: expect.any(Object),
+      routine: expect.any(Object),
+      scheduleItems: [
+        {
+          prescriptionMedicationId: 'med-1',
+          phaseId: 'phase-1',
+          phaseOrder: 1,
+          doses: expect.any(Array),
+        },
+      ],
+    });
   });
 
   it('allows swapping protocolId on an existing prescription medication', async () => {
