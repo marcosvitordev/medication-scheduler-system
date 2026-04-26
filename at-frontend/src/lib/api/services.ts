@@ -4,7 +4,6 @@ import type {
   ClinicalMedication,
   CreatePatientPrescriptionDto,
   Patient,
-  PatientPrescription,
   PatientRoutine,
   UpdatePatientPrescriptionDto,
 } from "@/types/contracts";
@@ -35,7 +34,6 @@ export const prescriptionService = {
       method: "PATCH",
       body,
     }),
-  list: () => apiRequest<PatientPrescription[]>("/patient-prescriptions"),
   getSchedule: (prescriptionId: string) =>
     apiRequest<CalendarScheduleResponseDto>(`/patient-prescriptions/${prescriptionId}/schedule`),
 };

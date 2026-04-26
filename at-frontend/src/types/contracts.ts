@@ -9,15 +9,22 @@ export type TreatmentRecurrence =
 
 export type DoseUnit =
   | "COMP"
-  | "CP"
-  | "CAPS"
+  | "CAP"
+  | "DRAGEA"
   | "ML"
   | "GOTAS"
   | "UI"
-  | "UNIDADE"
-  | "SACHE"
-  | "JATO"
-  | "APLICACAO";
+  | "JATOS"
+  | "APLICADOR"
+  | "BISNAGA"
+  | "SUPOSITORIO"
+  | "AREA_AFETADA";
+
+export type OcularLaterality = "RIGHT_EYE" | "LEFT_EYE" | "BOTH_EYES";
+
+export type OticLaterality = "RIGHT_EAR" | "LEFT_EAR" | "BOTH_EARS";
+
+export type MonthlySpecialReference = "MENSTRUATION_START";
 
 export interface PatientRoutine {
   id: string;
@@ -113,6 +120,17 @@ export interface CreatePatientPrescriptionPhaseDto {
   monthlyDay?: number;
   alternateDaysInterval?: number;
   prnReason?: string;
+  monthlySpecialReference?: MonthlySpecialReference;
+  monthlySpecialBaseDate?: string;
+  monthlySpecialOffsetDays?: number;
+  ocularLaterality?: OcularLaterality;
+  oticLaterality?: OticLaterality;
+  glycemiaScaleRanges?: Array<{
+    minimum: number;
+    maximum: number;
+    doseValue: string;
+    doseUnit: DoseUnit;
+  }>;
   treatmentDays?: number;
   continuousUse: boolean;
   manualAdjustmentEnabled: boolean;
@@ -209,6 +227,7 @@ export interface CalendarScheduleDoseDto {
 
 export interface CalendarScheduleItemDto {
   prescriptionMedicationId: string;
+  phaseId: string;
   phaseOrder: number;
   medicamento: string;
   principioAtivo: string;
@@ -225,6 +244,7 @@ export interface CalendarScheduleItemDto {
 }
 
 export interface CalendarScheduleResponseDto {
+  prescriptionId: string;
   documentHeader: CalendarDocumentHeaderDto;
   patient: CalendarPatientDto;
   routine: CalendarRoutineDto;

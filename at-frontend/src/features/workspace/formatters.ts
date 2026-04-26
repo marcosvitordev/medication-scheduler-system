@@ -15,7 +15,7 @@ export function flattenDoses(scheduleItems: CalendarScheduleItemDto[]) {
       item.doses.map((dose) => ({
         item,
         dose,
-        key: `${item.prescriptionMedicationId}:${item.phaseOrder}:${dose.label}`,
+        key: `${item.prescriptionMedicationId}:${item.phaseId}:${dose.label}`,
       })),
     )
     .sort((left, right) =>

@@ -619,6 +619,7 @@ export class SchedulingService {
     });
 
     return {
+      prescriptionId: prescription.id,
       documentHeader: this.mapDocumentHeader(),
       patient: this.mapPatientHeader(prescription, generationDate),
       routine: this.mapRoutineHeader(routine),
@@ -700,6 +701,7 @@ export class SchedulingService {
 
         return {
           prescriptionMedicationId: medication.id,
+          phaseId: phase.id,
           phaseOrder: phase.phaseOrder,
           medicamento:
             medication.medicationSnapshot.commercialName ??

@@ -8,6 +8,19 @@ const perDoseOverrideSchema = z.object({
   doseUnit: z.string().min(1, "Selecione a unidade."),
 });
 
+const glycemiaScaleRangeSchema = z.object({
+  minimum: z.preprocess(
+    (value) => (value === "" || Number.isNaN(value) ? undefined : value),
+    z.coerce.number().int("Informe valor inteiro.").min(0, "Informe valor mínimo maior ou igual a zero."),
+  ),
+  maximum: z.preprocess(
+    (value) => (value === "" || Number.isNaN(value) ? undefined : value),
+    z.coerce.number().int("Informe valor inteiro.").min(0, "Informe valor máximo maior ou igual a zero."),
+  ),
+  doseValue: z.string().min(1, "Informe a dose."),
+  doseUnit: z.string().min(1, "Selecione a unidade."),
+});
+
 export const patientFormSchema = z.object({
   fullName: z.string().min(3, "Informe o nome completo."),
   birthDate: z.string().min(1, "Informe a data de nascimento."),
@@ -39,11 +52,20 @@ export const prescriptionPhaseFormSchema = z
       (value) => (value === "" || Number.isNaN(value) ? undefined : value),
       z.coerce.number().min(1, "Informe um dia entre 1 e 31.").max(31, "Informe um dia entre 1 e 31.").optional(),
     ),
+    monthlySpecialReference: z.enum(["MENSTRUATION_START"]).optional(),
+    monthlySpecialBaseDate: z.string().optional(),
+    monthlySpecialOffsetDays: z.preprocess(
+      (value) => (value === "" || Number.isNaN(value) ? undefined : value),
+      z.coerce.number().int("Informe valor inteiro.").min(1, "Informe deslocamento maior que zero.").optional(),
+    ),
     alternateDaysInterval: z.preprocess(
       (value) => (value === "" || Number.isNaN(value) ? undefined : value),
       z.coerce.number().min(2, "Informe intervalo mínimo de 2 dias.").optional(),
     ),
     prnReason: z.string().optional(),
+    ocularLaterality: z.enum(["RIGHT_EYE", "LEFT_EYE", "BOTH_EYES"]).optional(),
+    oticLaterality: z.enum(["RIGHT_EAR", "LEFT_EAR", "BOTH_EARS"]).optional(),
+    glycemiaScaleRanges: z.array(glycemiaScaleRangeSchema).optional(),
     treatmentDays: z.preprocess(
       (value) => (value === "" || Number.isNaN(value) ? undefined : value),
       z.coerce.number().min(1, "Informe pelo menos 1 dia.").optional(),
@@ -103,12 +125,51 @@ export const prescriptionPhaseFormSchema = z
       });
     }
 
-    if (phase.recurrenceType === "MONTHLY" && phase.monthlyDay === undefined) {
+    const hasMonthlySpecialFields =
+      phase.monthlySpecialReference !== undefined ||
+      Boolean(phase.monthlySpecialBaseDate) ||
+      phase.monthlySpecialOffsetDays !== undefined;
+
+    if (phase.recurrenceType === "MONTHLY" && phase.monthlyDay === undefined && !hasMonthlySpecialFields) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Informe o dia do mês.",
         path: ["monthlyDay"],
       });
+    }
+
+    if (hasMonthlySpecialFields) {
+      if (phase.recurrenceType !== "MONTHLY") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Regra mensal especial exige recorrência mensal.",
+          path: ["recurrenceType"],
+        });
+      }
+
+      if (!phase.monthlySpecialReference) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Selecione a referência mensal.",
+          path: ["monthlySpecialReference"],
+        });
+      }
+
+      if (!phase.monthlySpecialBaseDate) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Informe a data base clínica.",
+          path: ["monthlySpecialBaseDate"],
+        });
+      }
+
+      if (phase.monthlySpecialOffsetDays === undefined) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Informe o deslocamento em dias.",
+          path: ["monthlySpecialOffsetDays"],
+        });
+      }
     }
 
     if (phase.recurrenceType === "ALTERNATE_DAYS" && phase.alternateDaysInterval === undefined) {
@@ -134,6 +195,36 @@ export const prescriptionPhaseFormSchema = z
         path: ["manualTimes"],
       });
     }
+
+    const ranges = [...(phase.glycemiaScaleRanges ?? [])].sort((left, right) => left.minimum - right.minimum);
+    ranges.forEach((range, index) => {
+      if (range.maximum < range.minimum) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "O valor máximo deve ser maior ou igual ao mínimo.",
+          path: ["glycemiaScaleRanges", index, "maximum"],
+        });
+      }
+
+      const previous = ranges[index - 1];
+      if (!previous) return;
+
+      if (range.minimum <= previous.maximum) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "As faixas glicêmicas não podem se sobrepor.",
+          path: ["glycemiaScaleRanges"],
+        });
+      }
+
+      if (range.minimum !== previous.maximum + 1) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "As faixas glicêmicas não podem ter lacunas.",
+          path: ["glycemiaScaleRanges"],
+        });
+      }
+    });
   });
 
 export const prescriptionMedicationFormSchema = z.object({

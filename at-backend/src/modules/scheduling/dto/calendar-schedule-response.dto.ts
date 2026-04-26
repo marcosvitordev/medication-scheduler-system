@@ -51,6 +51,7 @@ export interface CalendarScheduleDoseDto {
 
 export interface CalendarScheduleItemDto {
   prescriptionMedicationId: string;
+  phaseId: string;
   phaseOrder: number;
   medicamento: string;
   principioAtivo: string;
@@ -67,6 +68,7 @@ export interface CalendarScheduleItemDto {
 }
 
 export interface CalendarScheduleResponseDto {
+  prescriptionId: string;
   documentHeader: CalendarDocumentHeaderDto;
   patient: CalendarPatientDto;
   routine: CalendarRoutineDto;

@@ -57,6 +57,7 @@ describe("SchedulingService final calendar JSON contract", () => {
     );
 
     expect(result).toMatchObject({
+      prescriptionId: expect.any(String),
       documentHeader: {
         nomeEmpresa: "AT Farma",
         cnpj: "12.345.678/0001-90",
@@ -87,6 +88,7 @@ describe("SchedulingService final calendar JSON contract", () => {
 
     expect(result.scheduleItems[0]).toMatchObject({
       prescriptionMedicationId: expect.any(String),
+      phaseId: expect.any(String),
       medicamento: "CONTRAVE",
       principioAtivo: "Naltrexona 8 mg + Bupropiona 90 mg",
       apresentacao: "Comprimido revestido de liberacao prolongada",
