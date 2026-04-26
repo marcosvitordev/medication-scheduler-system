@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError, Repository } from 'typeorm';
 import { validateRoutine } from '../../common/utils/routine.util';
@@ -16,7 +16,34 @@ export class PatientService {
   ) {}
 
   async createPatient(dto: CreatePatientDto): Promise<Patient> {
-    return this.patientRepository.save(this.patientRepository.create(dto));
+    const normalizedCpf = normalizeCpf(dto.cpf);
+    if (normalizedCpf !== undefined && normalizedCpf.length !== 11) {
+      throw new BadRequestException('CPF deve conter exatamente 11 dígitos.');
+    }
+
+    if (normalizedCpf) {
+      const existingPatient = await this.patientRepository.findOne({
+        where: { cpf: normalizedCpf },
+      });
+      if (existingPatient) {
+        throw new ConflictException('Já existe um paciente cadastrado com este CPF.');
+      }
+    }
+
+    try {
+      return await this.patientRepository.save(
+        this.patientRepository.create({
+          ...dto,
+          cpf: normalizedCpf,
+        }),
+      );
+    } catch (error) {
+      if (this.isPatientCpfUniqueViolation(error)) {
+        throw new ConflictException('Já existe um paciente cadastrado com este CPF.');
+      }
+
+      throw error;
+    }
   }
 
   async addRoutine(patientId: string, dto: CreateRoutineDto): Promise<PatientRoutine> {
@@ -91,4 +118,25 @@ export class PatientService {
       driverError?.constraint === 'IDX_patient_routines_single_active'
     );
   }
+
+  private isPatientCpfUniqueViolation(error: unknown): boolean {
+    if (!(error instanceof QueryFailedError)) {
+      return false;
+    }
+
+    const driverError = error.driverError as { code?: string; constraint?: string } | undefined;
+    return (
+      driverError?.code === '23505' &&
+      driverError?.constraint === 'IDX_patients_cpf_unique'
+    );
+  }
+}
+
+export function normalizeCpf(cpf: string | null | undefined): string | undefined {
+  if (cpf === null || cpf === undefined) {
+    return undefined;
+  }
+
+  const digits = cpf.replace(/\D/g, '');
+  return digits.length > 0 ? digits : undefined;
 }

@@ -15,6 +15,7 @@ describe('Migration registry', () => {
       '1763571600000-NormalizePrescriptionPhaseDoseOverrides.ts',
       '1763662800000-HardenConflictAuditColumnsInScheduledDoses.ts',
       '1763749200000-AddBathTimeToPatientRoutines.ts',
+      '1763835600000-AddUniquePatientCpfIndex.ts',
     ]);
   });
 });

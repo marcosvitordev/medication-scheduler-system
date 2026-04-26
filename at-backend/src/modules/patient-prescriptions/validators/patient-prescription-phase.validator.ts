@@ -69,9 +69,10 @@ export function IsPatientPrescriptionPhaseValid(
 }
 
 export function getPhaseValidationError(phase: PhaseLike): string | undefined {
-  const hasMonthlySpecialReference = Boolean(phase.monthlySpecialReference);
-  const hasMonthlySpecialBaseDate = Boolean(phase.monthlySpecialBaseDate);
-  const hasMonthlySpecialOffsetDays = phase.monthlySpecialOffsetDays !== undefined;
+  const hasMonthlySpecialReference = isPresent(phase.monthlySpecialReference);
+  const hasMonthlySpecialBaseDate = isPresent(phase.monthlySpecialBaseDate);
+  const monthlySpecialOffsetDays = phase.monthlySpecialOffsetDays;
+  const hasMonthlySpecialOffsetDays = isPresent(monthlySpecialOffsetDays);
   const hasAnyMonthlySpecialRule =
     hasMonthlySpecialReference || hasMonthlySpecialBaseDate || hasMonthlySpecialOffsetDays;
 
@@ -101,7 +102,7 @@ export function getPhaseValidationError(phase: PhaseLike): string | undefined {
 
   if (
     phase.recurrenceType === TreatmentRecurrence.MONTHLY &&
-    phase.monthlyDay === undefined &&
+    !isPresent(phase.monthlyDay) &&
     !phase.monthlyRule &&
     !hasAnyMonthlySpecialRule
   ) {
@@ -110,8 +111,7 @@ export function getPhaseValidationError(phase: PhaseLike): string | undefined {
 
   if (
     hasMonthlySpecialOffsetDays &&
-    phase.monthlySpecialOffsetDays !== undefined &&
-    phase.monthlySpecialOffsetDays <= 0
+    monthlySpecialOffsetDays <= 0
   ) {
     return 'monthlySpecialOffsetDays deve ser maior que zero quando monthlySpecial* for informado.';
   }
@@ -160,6 +160,10 @@ export function getPhaseValidationError(phase: PhaseLike): string | undefined {
   }
 
   return undefined;
+}
+
+function isPresent<T>(value: T | null | undefined): value is NonNullable<T> {
+  return value !== undefined && value !== null;
 }
 
 function coversAllDoseLabels(

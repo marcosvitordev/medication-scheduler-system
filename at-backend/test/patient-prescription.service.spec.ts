@@ -2839,6 +2839,67 @@ describe('PatientPrescriptionService', () => {
     expect(phase?.manualTimes).toEqual(['09:00']);
   });
 
+  it('updates a multi-dose phase with a complete manualTimes set and nullable monthly fields', async () => {
+    const { service, state } = createUpdateServiceHarness();
+    const medication = (
+      state.prescription.medications as Array<{
+        protocolSnapshot: {
+          frequencies: Array<{
+            frequency: number;
+            allowedRecurrenceTypes?: TreatmentRecurrence[];
+          }>;
+        };
+        phases: Array<{
+          id: string;
+          frequency: number;
+          manualAdjustmentEnabled?: boolean;
+          manualTimes?: string[];
+          monthlyDay?: number | null;
+          monthlySpecialReference?: MonthlySpecialReference | null;
+          monthlySpecialBaseDate?: string | null;
+          monthlySpecialOffsetDays?: number | null;
+        }>;
+      }>
+    )[0];
+    const phase = medication.phases[0];
+    medication.protocolSnapshot.frequencies.push({
+      frequency: 2,
+      allowedRecurrenceTypes: [TreatmentRecurrence.DAILY],
+    });
+    phase.frequency = 2;
+    phase.monthlyDay = null;
+    phase.monthlySpecialReference = null;
+    phase.monthlySpecialBaseDate = null;
+    phase.monthlySpecialOffsetDays = null;
+
+    await service.updatePrescription('rx-1', {
+      updateMedications: [
+        {
+          prescriptionMedicationId: 'med-1',
+          updatePhases: [
+            {
+              phaseId: 'phase-1',
+              manualAdjustmentEnabled: true,
+              manualTimes: ['08:00', '20:00'],
+            },
+          ],
+        },
+      ],
+    } as never);
+
+    const updatedPhase = (
+      state.prescription.medications as Array<{
+        phases: Array<{
+          id: string;
+          manualAdjustmentEnabled: boolean;
+          manualTimes?: string[];
+        }>;
+      }>
+    )[0].phases.find((item) => item.id === 'phase-1');
+    expect(updatedPhase?.manualAdjustmentEnabled).toBe(true);
+    expect(updatedPhase?.manualTimes).toEqual(['08:00', '20:00']);
+  });
+
   it('replaces all phases of a medication', async () => {
     const { service, state } = createUpdateServiceHarness();
 

@@ -6,6 +6,14 @@ at-backend/.env.*
 !at-backend/.env.example
 at-backend/tsconfig.build.tsbuildinfo
 
+# Frontend
+at-frontend/node_modules/
+at-frontend/.next/
+at-frontend/out/
+at-frontend/.env
+at-frontend/.env.*
+!at-frontend/.env.example
+
 # VS Code & IDE
 .codex
 .vscode/settings.json

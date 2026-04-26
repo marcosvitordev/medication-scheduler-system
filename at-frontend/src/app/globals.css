@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 195 20% 97%;
+  --foreground: 198 23% 15%;
+  --border: 195 19% 87%;
+  --input: 195 16% 74%;
+  --ring: 168 59% 30%;
+  --primary: 168 59% 30%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 195 18% 94%;
+  --secondary-foreground: 198 23% 15%;
+  --muted: 195 18% 94%;
+  --muted-foreground: 197 11% 45%;
+  --accent: 34 88% 37%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 4 74% 40%;
+  --destructive-foreground: 0 0% 100%;
+  --warning: 38 74% 42%;
+  --warning-foreground: 42 100% 95%;
+  --success: 150 48% 30%;
+  --success-foreground: 0 0% 100%;
+  --radius: 8px;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  min-height: 100vh;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}

@@ -946,9 +946,9 @@ export class PatientPrescriptionService {
     isContraceptiveMonthly: boolean,
   ): void {
     const hasMonthlySpecialFields =
-      Boolean(phase.monthlySpecialReference) ||
-      Boolean(phase.monthlySpecialBaseDate) ||
-      phase.monthlySpecialOffsetDays !== undefined;
+      isPresent(phase.monthlySpecialReference) ||
+      isPresent(phase.monthlySpecialBaseDate) ||
+      isPresent(phase.monthlySpecialOffsetDays);
 
     if (isContraceptiveMonthly) {
       if (phase.recurrenceType !== TreatmentRecurrence.MONTHLY) {
@@ -961,9 +961,9 @@ export class PatientPrescriptionService {
         );
       }
       if (
-        !phase.monthlySpecialReference ||
-        !phase.monthlySpecialBaseDate ||
-        phase.monthlySpecialOffsetDays === undefined
+        !isPresent(phase.monthlySpecialReference) ||
+        !isPresent(phase.monthlySpecialBaseDate) ||
+        !isPresent(phase.monthlySpecialOffsetDays)
       ) {
         this.throwPhaseDomainError(
           medicationId,
@@ -991,7 +991,7 @@ export class PatientPrescriptionService {
           'isContraceptiveMonthly=true exige valor > 0',
         );
       }
-      if (phase.monthlyDay !== undefined) {
+      if (isPresent(phase.monthlyDay)) {
         this.throwPhaseDomainError(
           medicationId,
           phase.phaseOrder,
@@ -1051,6 +1051,10 @@ export class PatientPrescriptionService {
       `Fase ${phaseOrder}: ${field} ${message} para medicamento ${medicationId}${capabilitySuffix}`,
     );
   }
+}
+
+function isPresent<T>(value: T | null | undefined): value is NonNullable<T> {
+  return value !== undefined && value !== null;
 }
 
 function medicationSnapshotFromEntity(

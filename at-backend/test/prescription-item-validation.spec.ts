@@ -139,6 +139,18 @@ describe('New DTO clinical validation', () => {
     ).toHaveLength(0);
   });
 
+  it('treats nullable monthlySpecial fields as absent for non-monthly phases', () => {
+    expect(
+      validatePhase({
+        recurrenceType: TreatmentRecurrence.DAILY,
+        monthlyDay: null as never,
+        monthlySpecialReference: null as never,
+        monthlySpecialBaseDate: null as never,
+        monthlySpecialOffsetDays: null as never,
+      }),
+    ).toHaveLength(0);
+  });
+
   it('rejects invalid monthlySpecialReference enum value', () => {
     const errors = validatePhase({
       recurrenceType: TreatmentRecurrence.MONTHLY,

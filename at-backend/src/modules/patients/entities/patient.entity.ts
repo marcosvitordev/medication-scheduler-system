@@ -1,8 +1,12 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { PatientRoutine } from './patient-routine.entity';
 import { PatientPrescription } from '../../patient-prescriptions/entities/patient-prescription.entity';
 
 @Entity('patients')
+@Index('IDX_patients_cpf_unique', ['cpf'], {
+  unique: true,
+  where: `"cpf" IS NOT NULL AND "cpf" <> ''`,
+})
 export class Patient {
   @PrimaryGeneratedColumn('uuid')
   id: string;

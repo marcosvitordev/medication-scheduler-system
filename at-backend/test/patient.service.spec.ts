@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError, Repository, DataSource } from 'typeorm';
 import { PatientService } from '../src/modules/patients/patient.service';
 import { Patient } from '../src/modules/patients/entities/patient.entity';
@@ -12,7 +12,11 @@ describe('PatientService', () => {
   let dataSource: Partial<DataSource>;
 
   beforeEach(() => {
-    patientRepository = {};
+    patientRepository = {
+      create: jest.fn((entity) => entity as Patient),
+      save: jest.fn(async (entity) => ({ id: 'patient-1', ...entity }) as Patient),
+      findOne: jest.fn(),
+    } as unknown as Partial<Repository<Patient>>;
     routineRepository = {
       find: jest.fn()
     };
@@ -25,6 +29,84 @@ describe('PatientService', () => {
       routineRepository as Repository<PatientRoutine>,
       dataSource as DataSource
     );
+  });
+
+  it('normalizes masked CPF before creating a patient', async () => {
+    (patientRepository.findOne as jest.Mock).mockResolvedValue(null);
+
+    await service.createPatient({
+      fullName: 'Paciente Teste',
+      birthDate: '1990-01-01',
+      cpf: '123.456.789-01',
+    });
+
+    expect(patientRepository.findOne).toHaveBeenCalledWith({
+      where: { cpf: '12345678901' },
+    });
+    expect(patientRepository.create).toHaveBeenCalledWith({
+      fullName: 'Paciente Teste',
+      birthDate: '1990-01-01',
+      cpf: '12345678901',
+    });
+  });
+
+  it('rejects duplicate patient CPF before saving', async () => {
+    (patientRepository.findOne as jest.Mock).mockResolvedValue({
+      id: 'patient-existing',
+      cpf: '12345678901',
+    });
+
+    await expect(
+      service.createPatient({
+        fullName: 'Paciente Teste',
+        birthDate: '1990-01-01',
+        cpf: '123.456.789-01',
+      }),
+    ).rejects.toThrow(ConflictException);
+    expect(patientRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('allows creating a patient without CPF', async () => {
+    await service.createPatient({
+      fullName: 'Paciente Sem CPF',
+      birthDate: '1990-01-01',
+    });
+
+    expect(patientRepository.findOne).not.toHaveBeenCalled();
+    expect(patientRepository.create).toHaveBeenCalledWith({
+      fullName: 'Paciente Sem CPF',
+      birthDate: '1990-01-01',
+      cpf: undefined,
+    });
+  });
+
+  it('rejects CPF with a digit count different from 11', async () => {
+    await expect(
+      service.createPatient({
+        fullName: 'Paciente Teste',
+        birthDate: '1990-01-01',
+        cpf: '123.456',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(patientRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('translates patient CPF unique violations into ConflictException', async () => {
+    (patientRepository.findOne as jest.Mock).mockResolvedValue(null);
+    const driverError = Object.assign(new Error('duplicate key value violates unique constraint'), {
+      code: '23505',
+      constraint: 'IDX_patients_cpf_unique',
+    });
+    const uniqueViolation = new QueryFailedError('INSERT INTO patients ...', [], driverError);
+    (patientRepository.save as jest.Mock).mockRejectedValue(uniqueViolation);
+
+    await expect(
+      service.createPatient({
+        fullName: 'Paciente Teste',
+        birthDate: '1990-01-01',
+        cpf: '12345678901',
+      }),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('translates single active routine unique violations into ConflictException', async () => {
